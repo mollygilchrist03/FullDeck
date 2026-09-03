@@ -1,5 +1,5 @@
 import type { Card } from '../../types/card'
-import { resolveBattle } from './warLogic'
+import { compareCards, warBuryCount } from './warLogic'
 
 export type WarPhase = 'idle' | 'ready' | 'war' | 'gameover'
 
@@ -10,10 +10,12 @@ export interface WarState {
   /** The cards currently face-up on the table, or null between battles. */
   playerCard: Card | null
   dealerCard: Card | null
-  /** Cards staked from earlier ties this battle, waiting for a winner. */
-  spoils: Card[]
+  /** Every card staked this battle from ties and wars, awaiting a winner. */
+  pot: Card[]
+  /** Face-down cards buried on the most recent war round (for display). */
+  buried: number
   lastWinner: 'player' | 'dealer' | null
-  /** Cards won on the most recent decisive battle (for a "+N" flourish). */
+  /** Cards won on the most recent decisive battle. */
   lastPotSize: number
   battles: number
   phase: WarPhase
@@ -31,7 +33,8 @@ export function initWar(): WarState {
     dealerPile: [],
     playerCard: null,
     dealerCard: null,
-    spoils: [],
+    pot: [],
+    buried: 0,
     lastWinner: null,
     lastPotSize: 0,
     battles: 0,
@@ -49,6 +52,26 @@ function shuffle(cards: Card[]): Card[] {
   return out
 }
 
+/** Award every card in play to `winner`; end the game if the loser is now empty. */
+function award(state: WarState, winner: 'player' | 'dealer', faceUps: Card[]): WarState {
+  const spoils = shuffle([...state.pot, ...faceUps])
+  const playerPile = winner === 'player' ? [...state.playerPile, ...spoils] : state.playerPile
+  const dealerPile = winner === 'dealer' ? [...state.dealerPile, ...spoils] : state.dealerPile
+  const over = playerPile.length === 0 || dealerPile.length === 0
+  return {
+    ...state,
+    playerPile,
+    dealerPile,
+    playerCard: state.playerCard,
+    dealerCard: state.dealerCard,
+    pot: [],
+    lastWinner: winner,
+    lastPotSize: spoils.length,
+    phase: over ? 'gameover' : 'ready',
+    winner: over ? winner : null,
+  }
+}
+
 export function warReducer(state: WarState, action: WarAction): WarState {
   switch (action.type) {
     case 'START':
@@ -61,52 +84,87 @@ export function warReducer(state: WarState, action: WarAction): WarState {
 
     case 'FLIP': {
       if (state.phase !== 'ready' && state.phase !== 'war') return state
-
-      // A player who can't produce a card loses everything on the table.
-      if (state.playerPile.length === 0) {
-        return { ...state, phase: 'gameover', winner: 'dealer' }
-      }
-      if (state.dealerPile.length === 0) {
-        return { ...state, phase: 'gameover', winner: 'player' }
-      }
-
-      const [playerCard, ...playerRest] = state.playerPile
-      const [dealerCard, ...dealerRest] = state.dealerPile
-      const { winner, pot } = resolveBattle(playerCard, dealerCard, state.spoils)
       const battles = state.battles + 1
 
-      if (winner === null) {
-        // Tie — stake both cards and flip again.
+      // A player who can't produce a face-up card loses; the other side sweeps
+      // the table.
+      const onTable = [
+        ...state.pot,
+        ...(state.playerCard ? [state.playerCard] : []),
+        ...(state.dealerCard ? [state.dealerCard] : []),
+      ]
+      if (state.playerPile.length === 0) {
         return {
+          ...state,
+          dealerPile: [...state.dealerPile, ...onTable],
+          pot: [],
+          playerCard: null,
+          dealerCard: null,
+          phase: 'gameover',
+          winner: 'dealer',
+        }
+      }
+      if (state.dealerPile.length === 0) {
+        return {
+          ...state,
+          playerPile: [...state.playerPile, ...onTable],
+          pot: [],
+          playerCard: null,
+          dealerCard: null,
+          phase: 'gameover',
+          winner: 'player',
+        }
+      }
+
+      if (state.phase === 'ready') {
+        const [playerCard, ...playerRest] = state.playerPile
+        const [dealerCard, ...dealerRest] = state.dealerPile
+        const result = compareCards(playerCard, dealerCard)
+        const mid = {
           ...state,
           playerPile: playerRest,
           dealerPile: dealerRest,
           playerCard,
           dealerCard,
-          spoils: pot,
+          buried: 0,
           battles,
-          phase: 'war',
         }
+        // The two tied cards stay face-up for display and fold into the pot on
+        // the next flip.
+        if (result === 'war') return { ...mid, phase: 'war' }
+        return award(mid, result, [playerCard, dealerCard])
       }
 
-      const won = shuffle(pot)
-      const playerPile = winner === 'player' ? [...playerRest, ...won] : playerRest
-      const dealerPile = winner === 'dealer' ? [...dealerRest, ...won] : dealerRest
-      const over = playerPile.length === 0 || dealerPile.length === 0
-
-      return {
+      // phase === 'war': fold the tied face-ups into the pot, then each side
+      // buries up to three face-down and turns one up.
+      const carried = [
+        ...state.pot,
+        ...(state.playerCard ? [state.playerCard] : []),
+        ...(state.dealerCard ? [state.dealerCard] : []),
+      ]
+      const pBury = warBuryCount(state.playerPile.length)
+      const dBury = warBuryCount(state.dealerPile.length)
+      const pBuried = state.playerPile.slice(0, pBury)
+      const dBuried = state.dealerPile.slice(0, dBury)
+      const pAfter = state.playerPile.slice(pBury)
+      const dAfter = state.dealerPile.slice(dBury)
+      const [playerCard, ...playerRest] = pAfter
+      const [dealerCard, ...dealerRest] = dAfter
+      const potAfterBury = [...carried, ...pBuried, ...dBuried]
+      const result = compareCards(playerCard, dealerCard)
+      const mid = {
         ...state,
-        playerPile,
-        dealerPile,
+        playerPile: playerRest,
+        dealerPile: dealerRest,
         playerCard,
         dealerCard,
-        spoils: [],
-        lastWinner: winner,
-        lastPotSize: pot.length,
+        pot: potAfterBury,
+        buried: pBury + dBury,
         battles,
-        phase: over ? 'gameover' : 'ready',
-        winner: over ? winner : null,
       }
+      // Another tie: the new face-ups stay shown and fold in on the next flip.
+      if (result === 'war') return { ...mid, phase: 'war' }
+      return award(mid, result, [playerCard, dealerCard])
     }
 
     case 'RESET':

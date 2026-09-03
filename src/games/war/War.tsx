@@ -55,15 +55,18 @@ export function War() {
 
   const atWar = state.phase === 'war'
   const over = state.phase === 'gameover'
+  const potOnTable = state.pot.length + (state.playerCard ? 1 : 0) + (state.dealerCard ? 1 : 0)
   const banner = over
     ? state.winner === 'player'
       ? 'You take the whole deck — you win!'
       : 'The dealer has every card. You lose.'
-    : state.lastWinner && !atWar
-      ? `${state.lastWinner === 'player' ? 'You' : 'Dealer'} won ${state.lastPotSize} card${state.lastPotSize === 1 ? '' : 's'}`
-      : atWar
-        ? `War! ${state.spoils.length} cards on the line — flip again.`
-        : 'Flip a card. High card takes the pair; ties mean war.'
+    : atWar
+      ? state.buried > 0
+        ? `War! ${state.buried} cards face down, ${potOnTable} on the line — flip again.`
+        : `Tie — this means war. Flip again: three cards down, one up.`
+      : state.lastWinner
+        ? `${state.lastWinner === 'player' ? 'You' : 'Dealer'} won ${state.lastPotSize} card${state.lastPotSize === 1 ? '' : 's'}.`
+        : 'Flip a card. Higher rank wins the pair; a tie means war.'
 
   return (
     <Layout

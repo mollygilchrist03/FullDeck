@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareCards, resolveBattle } from './warLogic'
+import { compareCards, warBuryCount } from './warLogic'
 import { initWar, warReducer, type WarState } from './warReducer'
 import { card } from '../../test/helpers'
 import type { Card } from '../../types/card'
@@ -16,67 +16,103 @@ describe('compareCards', () => {
   })
 })
 
-describe('resolveBattle', () => {
-  it('gives the pot (spoils + both cards) to the higher card', () => {
-    const spoils = [card('2'), card('3')]
-    const { winner, pot } = resolveBattle(card('KING'), card('4'), spoils)
-    expect(winner).toBe('player')
-    expect(pot).toHaveLength(4)
+describe('warBuryCount', () => {
+  it('is three when the pile can spare it', () => {
+    expect(warBuryCount(26)).toBe(3)
+    expect(warBuryCount(4)).toBe(3)
   })
-
-  it('declares no winner on a tie but still stacks the pot', () => {
-    const { winner, pot } = resolveBattle(card('9'), card('9'), [card('2')])
-    expect(winner).toBeNull()
-    expect(pot).toHaveLength(3)
+  it('keeps one card back to turn face-up', () => {
+    expect(warBuryCount(3)).toBe(2)
+    expect(warBuryCount(2)).toBe(1)
+    expect(warBuryCount(1)).toBe(0)
+    expect(warBuryCount(0)).toBe(0)
   })
 })
 
 const deck = (ranks: Parameters<typeof card>[0][]): Card[] => ranks.map((r) => card(r))
+const start = (p: Card[], d: Card[]): WarState =>
+  warReducer(initWar(), { type: 'START', playerPile: p, dealerPile: d })
+
+const total = (s: WarState) =>
+  s.playerPile.length +
+  s.dealerPile.length +
+  s.pot.length +
+  (s.playerCard ? 1 : 0) +
+  (s.dealerCard ? 1 : 0)
 
 describe('warReducer', () => {
-  const start = (p: Card[], d: Card[]): WarState =>
-    warReducer(initWar(), { type: 'START', playerPile: p, dealerPile: d })
-
-  it('deals into a ready state', () => {
+  it('deals into a ready state with all 52 accounted for', () => {
     const s = start(deck(['KING', '2']), deck(['3', '4']))
     expect(s.phase).toBe('ready')
     expect(s.playerPile).toHaveLength(2)
   })
 
-  it('awards a decisive battle to the winner and conserves all 4 cards', () => {
+  it('awards a decisive flip to the higher card', () => {
     const s = warReducer(start(deck(['KING', '2']), deck(['3', '4'])), { type: 'FLIP' })
     expect(s.lastWinner).toBe('player')
-    // Won cards fold straight into the winner's pile — all 4 accounted for.
     expect(s.playerPile.length + s.dealerPile.length).toBe(4)
     expect(s.playerPile).toHaveLength(3)
-    expect(s.dealerPile).toHaveLength(1)
     expect(s.phase).toBe('ready')
   })
 
-  it('goes to war on a tie and stakes both cards', () => {
-    const s = warReducer(start(deck(['7', '9']), deck(['7', '2'])), { type: 'FLIP' })
+  it('a tie moves to war with the tied cards shown, not yet buried', () => {
+    const s = warReducer(
+      start(deck(['7', 'ACE', '2', '3', '4', '5']), deck(['7', '9', '2', '3', '4', '5'])),
+      { type: 'FLIP' },
+    )
     expect(s.phase).toBe('war')
-    expect(s.spoils).toHaveLength(2)
-    expect(s.playerPile).toHaveLength(1)
+    expect(s.pot).toHaveLength(0)
+    expect(s.buried).toBe(0)
+    expect([s.playerCard?.rank, s.dealerCard?.rank]).toEqual(['7', '7'])
+    expect(total(s)).toBe(12)
   })
 
-  it('resolves a war on the next flip, pot going to the higher card', () => {
-    let s = start(deck(['7', 'ACE']), deck(['7', '3']))
-    s = warReducer(s, { type: 'FLIP' }) // tie
-    s = warReducer(s, { type: 'FLIP' }) // ACE vs 3
-    expect(s.winner ?? s.lastWinner).toBe('player')
-    expect(s.spoils).toHaveLength(0)
-    expect(s.playerPile.length + s.dealerPile.length).toBe(4)
+  it('a war round buries three each, then the higher up-card sweeps 10', () => {
+    // flip 1: 7 vs 7 -> war. flip 2: bury 3 each, then ACE vs 3 -> player.
+    let s = start(
+      deck(['7', '2', '2', '2', 'ACE']),
+      deck(['7', '4', '4', '4', '3']),
+    )
+    s = warReducer(s, { type: 'FLIP' })
+    expect(s.phase).toBe('war')
+    s = warReducer(s, { type: 'FLIP' })
+    expect(s.buried).toBe(6)
+    expect(s.lastWinner ?? s.winner).toBe('player')
+    expect(s.lastPotSize).toBe(10) // 2 tied + 6 buried + 2 up
+    expect(s.pot).toHaveLength(0)
   })
 
-  it('ends the game when a player runs out of cards', () => {
+  it('returns every card to the piles once a war resolves', () => {
+    let s = start(
+      deck(['7', '2', '2', '2', 'ACE', '5', '6', '8']),
+      deck(['7', '4', '4', '4', '3', '9', '10', 'JACK']),
+    )
+    s = warReducer(s, { type: 'FLIP' }) // tie -> war
+    expect(s.phase).toBe('war')
+    expect(total(s)).toBe(16) // mid-battle: piles + pot + 2 shown
+    s = warReducer(s, { type: 'FLIP' }) // resolves
+    expect(s.phase).toBe('ready')
+    expect(s.pot).toHaveLength(0)
+    expect(s.playerPile.length + s.dealerPile.length).toBe(16)
+  })
+
+  it('ends the game when a player is emptied', () => {
     const s = warReducer(start(deck(['KING']), deck(['2'])), { type: 'FLIP' })
     expect(s.phase).toBe('gameover')
     expect(s.winner).toBe('player')
+    expect(s.playerPile).toHaveLength(2)
   })
 
-  it('a player who cannot flip loses', () => {
-    const mid: WarState = { ...initWar(), phase: 'ready', playerPile: [], dealerPile: deck(['2']) }
-    expect(warReducer(mid, { type: 'FLIP' }).winner).toBe('dealer')
+  it('a player who cannot flip loses and the table is swept', () => {
+    const stuck: WarState = {
+      ...initWar(),
+      phase: 'ready',
+      playerPile: [],
+      dealerPile: deck(['2']),
+      pot: deck(['5', '6']),
+    }
+    const s = warReducer(stuck, { type: 'FLIP' })
+    expect(s.winner).toBe('dealer')
+    expect(s.dealerPile).toHaveLength(3) // its own card + the 2 pot cards
   })
 })

@@ -13,19 +13,9 @@ export function compareCards(player: Card, dealer: Card): Battle {
 }
 
 /**
- * Simplified War: on a tie both cards go to a shared spoils pile and play
- * continues; whoever wins the next comparison takes the whole pile. (No
- * "three face-down" — keeps the state small and the outcome easy to reason
- * about.) `spoils` is everything already staked this battle, not counting the
- * two cards just flipped.
+ * Cards a side buries face-down going into a war: three, or as many as it can
+ * spare while keeping one to turn face-up. A side with no cards can't continue.
  */
-export function resolveBattle(
-  player: Card,
-  dealer: Card,
-  spoils: Card[],
-): { winner: 'player' | 'dealer' | null; pot: Card[] } {
-  const pot = [...spoils, player, dealer]
-  const result = compareCards(player, dealer)
-  if (result === 'war') return { winner: null, pot }
-  return { winner: result, pot }
+export function warBuryCount(pileSize: number): number {
+  return Math.min(3, Math.max(0, pileSize - 1))
 }
