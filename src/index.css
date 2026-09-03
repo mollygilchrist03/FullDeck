@@ -46,6 +46,7 @@ body,
 
 body {
   margin: 0;
+  overflow-x: hidden; /* belt-and-braces against a stray wide child */
   /* Felt photo (public/felt.jpg) scaled to fill the viewport, tinted a touch
      darker so cream text keeps its contrast. Solid colour is the fallback. */
   background-color: var(--color-felt-deep);

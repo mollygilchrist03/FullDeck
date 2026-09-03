@@ -128,12 +128,12 @@ export function VideoPoker() {
           </div>
 
           {/* Hand */}
-          <div className="flex justify-center gap-2 sm:gap-3">
+          <div className="flex flex-nowrap justify-center gap-1.5 sm:gap-3">
             {(state.hand.length ? state.hand : Array.from({ length: 5 })).map((_, i) => {
               const cardData = state.hand[i]
               const canHold = state.phase === 'holding' && !busy
               return (
-                <div key={`${state.handId}-${i}`} className="w-16 sm:w-20">
+                <div key={`${state.handId}-${i}`} className="w-[18vw] max-w-20 sm:w-20">
                   <div className="mb-1 h-4 text-center text-[0.65rem] font-bold uppercase tracking-widest text-gold">
                     {state.held[i] && state.phase !== 'bet' ? 'Held' : ' '}
                   </div>

@@ -40,11 +40,13 @@ function Board({ game }: { game: GameKey }) {
               >
                 {i + 1}
               </span>
-              <span className="flex-1 truncate text-card">{e.name}</span>
+              <span className="min-w-0 flex-1 truncate text-card">{e.name}</span>
               <span className="tabular-nums font-semibold text-card">
                 {formatScore(game, e.score)}
               </span>
-              <span className="w-24 text-right text-xs text-card/50">{timeAgo(e.createdAt)}</span>
+              <span className="hidden w-24 text-right text-xs text-card/50 sm:block">
+                {timeAgo(e.createdAt)}
+              </span>
             </li>
           ))}
         </ol>

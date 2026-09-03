@@ -13,8 +13,8 @@ export function Layout({ title, action, children }: LayoutProps) {
   const onLeaderboard = useLocation().pathname === '/leaderboard'
 
   return (
-    <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 pb-28 pt-4 sm:pb-8">
-      <header className="mb-4 flex items-center justify-between gap-3">
+    <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 pb-36 pt-4 sm:pb-8">
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-y-2 gap-x-3">
         <div className="flex items-center gap-3">
           {title ? (
             <Link
