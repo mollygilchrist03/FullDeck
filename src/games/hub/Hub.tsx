@@ -29,12 +29,12 @@ export function Hub() {
         <p className="mb-2 text-sm uppercase tracking-[0.3em] text-gold/80">Take a seat</p>
         <h1 className="font-display text-4xl font-bold text-card sm:text-5xl">Full Deck</h1>
         <p className="mx-auto mt-3 max-w-md text-card/75">
-          Two classic card games, built from scratch — real shuffling, dealing, and game
-          logic, with cards drawn live from the Deck of Cards API.
+          A handful of classic card games, built from scratch — real shuffling, dealing, and
+          game logic, with cards drawn live from the Deck of Cards API.
         </p>
       </section>
 
-      <div className="mx-auto mt-10 grid max-w-2xl gap-5 sm:grid-cols-2">
+      <div className="mx-auto mt-10 grid max-w-3xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <GameCard
           to="/blackjack"
           title="Blackjack"
@@ -46,6 +46,12 @@ export function Hub() {
           title="Memory Match"
           blurb="Flip and match every pair in as few moves as you can. Pick your grid size and race the clock."
           glyph="♥"
+        />
+        <GameCard
+          to="/war"
+          title="War"
+          blurb="Split the deck and flip. High card takes the pair, ties mean war. First to hold all 52 wins."
+          glyph="♦"
         />
       </div>
     </Layout>
