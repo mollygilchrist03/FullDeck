@@ -4,6 +4,7 @@ import { Blackjack } from './games/blackjack/Blackjack'
 import { Memory } from './games/memory/Memory'
 import { War } from './games/war/War'
 import { HighLow } from './games/highlow/HighLow'
+import { VideoPoker } from './games/videopoker/VideoPoker'
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
       <Route path="/memory" element={<Memory />} />
       <Route path="/war" element={<War />} />
       <Route path="/high-low" element={<HighLow />} />
+      <Route path="/video-poker" element={<VideoPoker />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

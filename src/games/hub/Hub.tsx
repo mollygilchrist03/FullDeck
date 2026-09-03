@@ -59,6 +59,12 @@ export function Hub() {
           blurb="One card up. Guess whether the next is higher or lower and build the longest streak you can."
           glyph="♣"
         />
+        <GameCard
+          to="/video-poker"
+          title="Video Poker"
+          blurb="Jacks or Better. Deal five, hold what you want, draw the rest, and get paid on the poker hand."
+          glyph="♠"
+        />
       </div>
     </Layout>
   )
