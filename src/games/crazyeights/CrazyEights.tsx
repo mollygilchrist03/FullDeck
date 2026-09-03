@@ -4,6 +4,7 @@ import { Button } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
+import { ScoreSubmit } from '../../components/ScoreSubmit'
 import type { Suit } from '../../types/card'
 import { isPlayable, SUITS } from './crazyEightsLogic'
 import {
@@ -203,6 +204,9 @@ export function CrazyEights() {
               <p className="font-display text-xl text-gold">
                 {state.winner === 'player' ? 'You went out — you win!' : 'The AI went out. You lose.'}
               </p>
+              {state.winner === 'player' && state.aiHand.length >= 1 && (
+                <ScoreSubmit game="crazy-eights" score={state.aiHand.length} />
+              )}
               <Button size="lg" variant="gold" onClick={() => void newGame()}>
                 Play again
               </Button>

@@ -4,6 +4,7 @@ import { Button } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
+import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { highLowReducer, initHighLow } from './highLowReducer'
 
 const JUDGEMENT_TEXT = {
@@ -152,6 +153,7 @@ export function HighLow() {
               <p className="font-display text-xl text-gold">
                 Run over at {state.streak} — best this session: {best}
               </p>
+              {best >= 1 && <ScoreSubmit game="high-low" score={best} />}
               <Button size="lg" variant="gold" onClick={() => void startRun()}>
                 Play again
               </Button>

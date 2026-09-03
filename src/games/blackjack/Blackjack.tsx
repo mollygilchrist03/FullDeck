@@ -4,13 +4,14 @@ import { Button } from '../../components/Button'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import type { Card as CardData } from '../../types/card'
-import { blackjackReducer, initBlackjack } from './blackjackReducer'
+import { blackjackReducer, initBlackjack, STARTING_BANK } from './blackjackReducer'
 import { dealerShouldHit } from './dealerAI'
 import { scoreHand } from './handScoring'
 import { Hand } from './components/Hand'
 import { ChipStack } from './components/ChipStack'
 import { BetControls } from './components/BetControls'
 import { ResultBanner } from './components/ResultBanner'
+import { ScoreSubmit } from '../../components/ScoreSubmit'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -19,7 +20,12 @@ export function Blackjack() {
   const [state, dispatch] = useReducer(blackjackReducer, undefined, initBlackjack)
   const [busy, setBusy] = useState(false)
   const [liveDealer, setLiveDealer] = useState<CardData[] | null>(null)
+  const [peakBank, setPeakBank] = useState(STARTING_BANK)
   const dealerRunFor = useRef(-1)
+
+  useEffect(() => {
+    setPeakBank((p) => Math.max(p, state.bank))
+  }, [state.bank])
 
   // `useDeck` returns a fresh object each render, but its methods are stable.
   const { startNewDeck, drawCards } = deck
@@ -141,6 +147,10 @@ export function Blackjack() {
 
           {state.phase === 'settled' && state.result && (
             <ResultBanner result={state.result} payout={state.payout} />
+          )}
+
+          {state.phase === 'settled' && peakBank > STARTING_BANK && (
+            <ScoreSubmit game="blackjack" score={peakBank} />
           )}
 
           {state.phase === 'betting' && (

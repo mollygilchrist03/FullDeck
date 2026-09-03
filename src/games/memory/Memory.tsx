@@ -14,6 +14,7 @@ import { Grid } from './components/Grid'
 import { Hud } from './components/Hud'
 import { DifficultySelector } from './components/DifficultySelector'
 import { CompletionScreen } from './components/CompletionScreen'
+import { ScoreSubmit } from '../../components/ScoreSubmit'
 
 const MISMATCH_DELAY = 900
 const PULSE_DELAY = 600
@@ -124,6 +125,11 @@ export function Memory() {
               elapsedMs={elapsedMs}
               onPlayAgain={() => void deal(state.gridSize)}
             />
+            {state.gridSize === 6 && (
+              <div className="mx-auto">
+                <ScoreSubmit game="memory" score={Math.max(1, Math.round(elapsedMs / 1000))} />
+              </div>
+            )}
             <div className="pointer-events-none opacity-50">
               <Grid
                 tiles={state.tiles}

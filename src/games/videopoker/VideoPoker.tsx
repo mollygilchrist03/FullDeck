@@ -4,6 +4,7 @@ import { Button } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
+import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { CATEGORY_LABEL } from './pokerHand'
 import { MAX_BET, PAY_PER_CREDIT } from './paytable'
 import {
@@ -43,7 +44,12 @@ export function VideoPoker() {
   const deck = useDeck()
   const [state, dispatch] = useReducer(videoPokerReducer, undefined, initVideoPoker)
   const [busy, setBusy] = useState(false)
+  const [bestWin, setBestWin] = useState(0)
   const didInit = useRef(false)
+
+  useEffect(() => {
+    if (state.result) setBestWin((b) => Math.max(b, state.result!.payout))
+  }, [state.result])
 
   const { startNewDeck, drawCards } = deck
 
@@ -157,6 +163,10 @@ export function VideoPoker() {
                 {state.result.payout > 0 ? `+$${state.result.payout}` : `-$${state.bet}`}
               </p>
             </div>
+          )}
+
+          {state.phase === 'result' && bestWin >= 1 && (
+            <ScoreSubmit game="video-poker" score={bestWin} />
           )}
 
           {/* Controls */}

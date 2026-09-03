@@ -54,6 +54,13 @@ in memory, and render card fronts straight from the API's image URLs (the
 [vector-playing-cards](https://code.google.com/archive/p/vector-playing-cards/)
 set it serves), with a CSS-drawn fallback if an image fails to load.
 
+**Leaderboard.** Each game reports one headline number to a shared,
+cross-visitor leaderboard at `/leaderboard` — peak bank (Blackjack), best 6×6
+time (Memory Match), longest streak (High-Low), fewest battles (War), biggest
+single win (Video Poker), cards left on the AI (Crazy Eights). Backed by a
+Postgres table behind a Vercel serverless function; the app runs fine without it
+(the API answers 503 and the UI says so).
+
 ## Notable engineering decisions
 
 The parts worth reading are the pure functions — each is isolated, unit-tested,
@@ -126,10 +133,21 @@ and free of any React or network concerns.
   `backface-hidden` faces and a `rotateY(180deg)` toggle — no layout shift, so it
   stays smooth on mobile.
 
-- **100 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
+- **One config module drives the leaderboard on both sides.**
+  [`src/lib/leaderboard.ts`](src/lib/leaderboard.ts) — the game list, each
+  metric's ranking direction, validation bounds, name sanitising, score
+  formatting — is imported by the React app *and* the
+  [`api/scores.ts`](api/scores.ts) serverless function, so a new game or a
+  changed bound is one edit. The API validates every POST against it and orders
+  each board `ASC`/`DESC` from `higherIsBetter`. `getDb()`
+  ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
+  route turns that into a 503 — the whole app works with no database attached.
+
+- **110 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
   outcome settlement, board building, card comparison, high-low judging, poker
-  evaluation, payouts, move legality, the Crazy Eights AI, and every reducer
-  transition. They need no network and no DOM.
+  evaluation, payouts, move legality, the Crazy Eights AI, leaderboard
+  validation/formatting, and every reducer transition. They need no network and
+  no DOM.
 
 ## Tech stack
 
@@ -138,28 +156,40 @@ and free of any React or network concerns.
 | Framework | React 19 + TypeScript (strict) |
 | Build | Vite |
 | Styling | Tailwind CSS v4 (palette defined in `@theme`) |
-| Routing | React Router — `/`, `/blackjack`, `/memory`, `/war`, `/high-low`, `/video-poker`, `/crazy-eights` |
+| Routing | React Router — `/`, the six game routes, `/leaderboard` |
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest (pure-logic unit tests) |
-| Data | Deck of Cards API (free, no key) |
-| Hosting | Vercel (static SPA) |
+| Card data | Deck of Cards API (free, no key) |
+| Leaderboard | Vercel serverless function (`api/`) + Neon Postgres via Drizzle ORM |
+| Hosting | Vercel (static SPA + functions) |
 
 ## Local setup
 
 ```bash
 npm install      # .npmrc pins legacy-peer-deps — npm 11 crashes on vitest's optional-peer graph
-npm run dev      # http://localhost:5173
-npm test         # game-logic unit tests (offline)
-npm run build    # tsc typecheck + production build
+npm run dev      # http://localhost:5173  (games work; /api is not served here)
+npm test         # game-logic + leaderboard unit tests (offline)
+npm run build    # tsc typecheck (app + api) + production build
 npm run lint
 ```
 
+The leaderboard needs the serverless function, which plain `vite` doesn't run.
+To exercise it locally, put a Postgres URL in `.env.local`
+(`cp .env.example .env.local`), run `npm run db:push` once, then `vercel dev`.
+Without it the games all work and the leaderboard shows "not available here".
+
 ## Deployment
 
-App → Vercel, framework preset **Vite**. [`vercel.json`](vercel.json) rewrites
-every path to `index.html` so the client router handles the game routes on a
-hard refresh. The repo is connected to Vercel, so a push to `master` is a
-production deploy. No environment variables — the card API is keyless.
+App → Vercel, framework preset **Vite**. Files in [`api/`](api/) deploy as
+serverless functions; [`vercel.json`](vercel.json) rewrites every non-`/api`
+path to `index.html` so the client router handles the routes on a hard refresh.
+The repo is connected to Vercel, so a push to `master` is a production deploy.
+
+**Leaderboard database.** Create a Postgres store in the Vercel project's
+**Storage** tab (or bring your own Neon project) and set `DATABASE_URL` in the
+project's environment variables, then run `npm run db:push` against it once to
+create the `scores` table. Until that's done the site still deploys and runs —
+the leaderboard just reports that it isn't configured.
 
 ## What's next
 
@@ -168,8 +198,8 @@ Things worth adding if this grew past a portfolio piece:
 - More games on the same `useDeck` foundation — Go Fish and heads-up Texas
   Hold'em (the poker evaluator already does most of the work) are the obvious
   next ones.
-- Persisted best scores and bankrolls — `localStorage` first, a backend only if
-  it ever needs to be shared.
+- Leaderboard hardening — a bot deterrent beyond the per-instance rate limit,
+  and server-side plausibility checks tighter than the current range bounds.
 - Component/interaction tests — the logic is covered, but the assembled UI
   currently leans on `tsc`, `vite build`, and manual play.
 - Sound and haptics on deal / flip / win.

@@ -4,6 +4,7 @@ import { Button } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
+import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { initWar, warReducer } from './warReducer'
 
 function Pile({ label, count }: { label: string; count: number }) {
@@ -121,9 +122,14 @@ export function War() {
           </p>
 
           {over ? (
-            <Button size="lg" variant="gold" onClick={() => void newGame()}>
-              Play again
-            </Button>
+            <div className="flex flex-col items-center gap-3">
+              {state.winner === 'player' && (
+                <ScoreSubmit game="war" score={state.battles} />
+              )}
+              <Button size="lg" variant="gold" onClick={() => void newGame()}>
+                Play again
+              </Button>
+            </div>
           ) : (
             <Button size="lg" variant={atWar ? 'accent' : 'gold'} onClick={() => dispatch({ type: 'FLIP' })}>
               {atWar ? 'Go to war' : 'Battle'}
