@@ -6,11 +6,13 @@ import { War } from './games/war/War'
 import { HighLow } from './games/highlow/HighLow'
 import { VideoPoker } from './games/videopoker/VideoPoker'
 import { CrazyEights } from './games/crazyeights/CrazyEights'
+import { Leaderboard } from './games/leaderboard/Leaderboard'
 
 export function App() {
   return (
     <Routes>
       <Route path="/" element={<Hub />} />
+      <Route path="/leaderboard" element={<Leaderboard />} />
       <Route path="/blackjack" element={<Blackjack />} />
       <Route path="/memory" element={<Memory />} />
       <Route path="/war" element={<War />} />
