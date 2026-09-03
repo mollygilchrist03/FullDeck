@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button } from './Button'
 import { submitScore } from '../hooks/useLeaderboard'
 import { formatScore, GAMES, NAME_MAX, type GameKey } from '../lib/leaderboard'
+import { isCleanName } from '../lib/profanity'
 
 const NAME_STORAGE_KEY = 'fulldeck:name'
 
@@ -40,6 +41,11 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
     if (!trimmed) {
       setStatus('error')
       setMessage('Enter a name first.')
+      return
+    }
+    if (!isCleanName(trimmed)) {
+      setStatus('error')
+      setMessage('Please pick a name without profanity.')
       return
     }
     setStatus('sending')

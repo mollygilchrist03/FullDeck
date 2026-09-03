@@ -9,6 +9,7 @@ import {
   sanitizeName,
   type GameKey,
 } from '../src/lib/leaderboard.js'
+import { isCleanName } from '../src/lib/profanity.js'
 
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 50
@@ -96,6 +97,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const name = sanitizeName(body.name)
       if (!name) {
         res.status(400).json({ error: 'A name is required.' })
+        return
+      }
+      if (!isCleanName(name)) {
+        res.status(400).json({ error: 'Please pick a name without profanity.' })
         return
       }
       if (!isValidScore(game, body.score)) {
