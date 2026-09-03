@@ -71,6 +71,12 @@ export function Hub() {
           blurb="Shed your hand first. Match the suit or rank, eights are wild — against an opponent that plays its own game."
           glyph="♥"
         />
+        <GameCard
+          to="/slapjack"
+          title="Slapjack"
+          blurb="Flip cards to the middle and race the dealer to slap every Jack. Fastest reaction wins the pile."
+          glyph="♦"
+        />
       </div>
     </Layout>
   )

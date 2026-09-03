@@ -6,6 +6,7 @@ import { War } from './games/war/War'
 import { HighLow } from './games/highlow/HighLow'
 import { VideoPoker } from './games/videopoker/VideoPoker'
 import { CrazyEights } from './games/crazyeights/CrazyEights'
+import { Slapjack } from './games/slapjack/Slapjack'
 import { Leaderboard } from './games/leaderboard/Leaderboard'
 
 export function App() {
@@ -19,6 +20,7 @@ export function App() {
       <Route path="/high-low" element={<HighLow />} />
       <Route path="/video-poker" element={<VideoPoker />} />
       <Route path="/crazy-eights" element={<CrazyEights />} />
+      <Route path="/slapjack" element={<Slapjack />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

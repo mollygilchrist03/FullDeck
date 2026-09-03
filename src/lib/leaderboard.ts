@@ -10,6 +10,9 @@ export type GameKey =
   | 'war'
   | 'video-poker'
   | 'crazy-eights'
+  | 'slapjack'
+  | 'go-fish'
+  | 'trash'
 
 export interface GameMeta {
   key: GameKey
@@ -93,6 +96,39 @@ export const GAMES: Record<GameKey, GameMeta> = {
     higherIsBetter: true,
     min: 1,
     max: 51,
+  },
+  slapjack: {
+    key: 'slapjack',
+    title: 'Slapjack',
+    metricLabel: 'Fastest slap (ms)',
+    metricHint: 'Your quickest reaction on a winning slap, in milliseconds.',
+    unit: '',
+    unitPosition: 'none',
+    higherIsBetter: false,
+    min: 60,
+    max: 3000,
+  },
+  'go-fish': {
+    key: 'go-fish',
+    title: 'Go Fish',
+    metricLabel: 'Books collected',
+    metricHint: 'Complete sets of four you finished a winning game with.',
+    unit: '',
+    unitPosition: 'none',
+    higherIsBetter: true,
+    min: 1,
+    max: 13,
+  },
+  trash: {
+    key: 'trash',
+    title: 'Trash',
+    metricLabel: 'Fewest turns',
+    metricHint: 'Turns taken to complete your row in a game you won.',
+    unit: '',
+    unitPosition: 'none',
+    higherIsBetter: false,
+    min: 1,
+    max: 200,
   },
 }
 
