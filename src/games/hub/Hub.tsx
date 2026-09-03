@@ -77,6 +77,12 @@ export function Hub() {
           blurb="Flip cards to the middle and race the dealer to slap every Jack. Fastest reaction wins the pile."
           glyph="♦"
         />
+        <GameCard
+          to="/go-fish"
+          title="Go Fish"
+          blurb="Ask the dealer for ranks and collect sets of four. More books than the dealer takes the game."
+          glyph="♣"
+        />
       </div>
     </Layout>
   )
