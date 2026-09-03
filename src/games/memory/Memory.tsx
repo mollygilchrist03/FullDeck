@@ -24,6 +24,7 @@ export function Memory() {
   const [dealing, setDealing] = useState(true)
   const [elapsedMs, setElapsedMs] = useState(0)
   const startAtRef = useRef<number | null>(null)
+  const didInit = useRef(false)
 
   const { reshuffleAndDraw } = deck
 
@@ -44,8 +45,10 @@ export function Memory() {
     [reshuffleAndDraw],
   )
 
-  // First deal.
+  // First deal (guard against React StrictMode's double-invoke).
   useEffect(() => {
+    if (didInit.current) return
+    didInit.current = true
     void deal(4)
   }, [deal])
 

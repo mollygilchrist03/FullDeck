@@ -21,7 +21,9 @@ export function Blackjack() {
   const [liveDealer, setLiveDealer] = useState<CardData[] | null>(null)
   const dealerRunFor = useRef(-1)
 
-  const { startNewDeck } = deck
+  // `useDeck` returns a fresh object each render, but its methods are stable.
+  const { startNewDeck, drawCards } = deck
+
   useEffect(() => {
     void startNewDeck()
   }, [startNewDeck])
@@ -29,7 +31,7 @@ export function Blackjack() {
   const handleDeal = useCallback(async () => {
     setBusy(true)
     try {
-      const cards = await deck.drawCards(4)
+      const cards = await drawCards(4)
       // Classic alternating deal: player, dealer, player, dealer.
       dispatch({
         type: 'DEAL',
@@ -41,25 +43,26 @@ export function Blackjack() {
     } finally {
       setBusy(false)
     }
-  }, [deck])
+  }, [drawCards])
 
   const handleHit = useCallback(async () => {
     setBusy(true)
     try {
-      const [card] = await deck.drawCards(1)
+      const [card] = await drawCards(1)
       dispatch({ type: 'HIT', card })
     } catch {
       /* surfaced via deck.error */
     } finally {
       setBusy(false)
     }
-  }, [deck])
+  }, [drawCards])
 
-  // Dealer's turn: draw with a beat between cards, then settle.
+  // Dealer's turn: draw with a beat between cards, then settle. Runs once per hand.
   useEffect(() => {
     if (state.phase !== 'dealer' || dealerRunFor.current === state.handId) return
     dealerRunFor.current = state.handId
     let cancelled = false
+    let completed = false
 
     ;(async () => {
       let dealer = [...state.dealerHand]
@@ -67,21 +70,24 @@ export function Blackjack() {
       while (dealerShouldHit(dealer)) {
         await sleep(650)
         if (cancelled) return
-        const [card] = await deck.drawCards(1)
+        const [card] = await drawCards(1)
         if (cancelled) return
         dealer = [...dealer, card]
         setLiveDealer(dealer)
       }
       await sleep(500)
       if (cancelled) return
+      completed = true
       dispatch({ type: 'DEALER_RESOLVE', dealerHand: dealer })
       setLiveDealer(null)
     })()
 
     return () => {
       cancelled = true
+      // Aborted before finishing (e.g. StrictMode remount) — let it run again.
+      if (!completed) dealerRunFor.current = -1
     }
-  }, [state.phase, state.handId, state.dealerHand, deck])
+  }, [state.phase, state.handId, state.dealerHand, drawCards])
 
   const restart = useCallback(() => {
     // Abandon a hand in progress and go back to betting with a fresh stack.
