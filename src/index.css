@@ -46,7 +46,16 @@ body,
 
 body {
   margin: 0;
+  /* Felt photo (public/felt.jpg) scaled to fill the viewport, tinted a touch
+     darker so cream text keeps its contrast. Solid colour is the fallback. */
   background-color: var(--color-felt-deep);
+  background-image:
+    linear-gradient(rgba(10, 61, 45, 0.32), rgba(10, 61, 45, 0.52)),
+    url('/felt.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   color: var(--color-card);
   font-family:
     system-ui,
@@ -57,11 +66,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Radial felt sheen behind everything */
+/* Overhead light + darkened corners, layered over the felt photo */
 #root {
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.06), transparent 60%),
-    radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, 0.35), transparent 55%);
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.07), transparent 55%),
+    radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, 0.4), transparent 55%),
+    radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.28));
 }
 
 /* ---- Card 3D flip primitives ---- */
