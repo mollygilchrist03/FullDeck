@@ -5,6 +5,7 @@ import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
+import { GameRules } from '../../components/GameRules'
 import { initWar, warReducer } from './warReducer'
 
 function Pile({ label, count }: { label: string; count: number }) {
@@ -82,6 +83,14 @@ export function War() {
           <ErrorNotice message={deck.error} onRetry={() => void newGame()} />
         </div>
       )}
+
+      <div className="mb-4">
+        <GameRules>
+          <p>The deck is split evenly between you and the dealer. Each battle you both turn your top card face up; the higher rank wins the pair (aces high). Won cards go to the bottom of the winner's pile.</p>
+          <p>Equal ranks mean <strong>war</strong>: on the next flip each side lays three cards face down and one face up, and the higher face-up card takes everything on the table. Another tie repeats it. Short on cards? You lay what you can and turn up your last card — run out entirely and you lose.</p>
+          <p>Win by collecting all 52 cards. Fewer battles is a better score.</p>
+        </GameRules>
+      </div>
 
       {dealing ? (
         <Loading label="Splitting the deck…" />

@@ -5,6 +5,7 @@ import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
+import { GameRules } from '../../components/GameRules'
 import { highLowReducer, initHighLow } from './highLowReducer'
 
 const JUDGEMENT_TEXT = {
@@ -76,6 +77,14 @@ export function HighLow() {
           <ErrorNotice message={deck.error} onRetry={() => void startRun()} />
         </div>
       )}
+
+      <div className="mb-4">
+        <GameRules>
+          <p>One card is face up. Call whether the <strong>next</strong> card will be higher or lower. Aces are high.</p>
+          <p>Right: your streak grows and the new card becomes the one to beat. Wrong: the run ends. Same rank: a push — the streak holds and nothing changes.</p>
+          <p>Your longest streak in a session is your score.</p>
+        </GameRules>
+      </div>
 
       {!shown && busy ? (
         <Loading label="Cutting the deck…" />

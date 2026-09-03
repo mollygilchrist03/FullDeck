@@ -15,6 +15,7 @@ import { Hud } from './components/Hud'
 import { DifficultySelector } from './components/DifficultySelector'
 import { CompletionScreen } from './components/CompletionScreen'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
+import { GameRules } from '../../components/GameRules'
 
 const MISMATCH_DELAY = 900
 const PULSE_DELAY = 600
@@ -98,6 +99,11 @@ export function Memory() {
       }
     >
       <div className="flex flex-col gap-5">
+        <GameRules>
+          <p>Every card has a twin. Flip two cards a turn: if their ranks match they stay face up; if not, the board locks for a moment and they flip back.</p>
+          <p>Clear every pair to win. A lower move count and a faster time are better. Pick a 4×4 board (8 pairs) or 6×6 (18 pairs) — only 6×6 times go on the leaderboard.</p>
+        </GameRules>
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <DifficultySelector value={state.gridSize} onChange={changeDifficulty} disabled={dealing} />
           <p className="text-xs text-card/60">{deck.remaining} cards left</p>

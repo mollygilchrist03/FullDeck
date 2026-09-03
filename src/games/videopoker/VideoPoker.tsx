@@ -5,6 +5,7 @@ import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
+import { GameRules } from '../../components/GameRules'
 import { CATEGORY_LABEL } from './pokerHand'
 import { MAX_BET, PAY_PER_CREDIT } from './paytable'
 import {
@@ -102,6 +103,13 @@ export function VideoPoker() {
           <ErrorNotice message={deck.error} onRetry={() => void startNewDeck()} />
         </div>
       )}
+
+      <div className="mb-4">
+        <GameRules>
+          <p>Bet 1–5 credits and you're dealt five cards. Tap the cards you want to <strong>hold</strong>, then <strong>draw</strong> to replace the rest. The final five-card poker hand is paid on the 9/6 Jacks or Better table (open the paytable below).</p>
+          <p>Only a pair of jacks or better pays. Aces play high or low for straights (A-2-3-4-5 and 10-J-Q-K-A). A royal flush jumps to 800× per credit when you bet the max 5.</p>
+        </GameRules>
+      </div>
 
       {!deck.deckId && deck.loading ? (
         <Loading />

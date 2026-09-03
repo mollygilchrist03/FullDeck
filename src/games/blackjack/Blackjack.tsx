@@ -4,6 +4,7 @@ import { Button } from '../../components/Button'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
+import { GameRules } from '../../components/GameRules'
 import type { Card as CardData } from '../../types/card'
 import {
   blackjackReducer,
@@ -142,6 +143,13 @@ export function Blackjack() {
         <Loading />
       ) : (
         <div className="flex flex-col gap-5">
+          <GameRules>
+            <p>Beat the dealer's hand without going over 21. Number cards score their face value, J/Q/K are 10, and an ace is 1 or 11 — whichever helps.</p>
+            <p>You and the dealer each get two cards; one dealer card stays face down. <strong>Hit</strong> takes a card, <strong>Stand</strong> stops. <strong>Double</strong> (two-card hands only) doubles your bet for exactly one more card. <strong>Split</strong> a matching pair into two hands, each with its own bet — split aces get one card each, and a two-card 21 after a split is a plain 21, not a blackjack.</p>
+            <p>If the dealer shows an ace you're offered <strong>insurance</strong> — a side bet up to half your stake that pays 2:1 if the dealer has blackjack. The dealer then draws to 17 and stands on all 17s.</p>
+            <p>Blackjack (ace + a ten-value card in your first two) pays 3:2; other wins pay even money; equal totals push. Not included: surrender, re-splitting aces, dealer hitting soft 17.</p>
+          </GameRules>
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <ChipStack bank={state.bank} committed={committed(state)} />
             <p className="text-xs text-card/60">{deck.remaining} cards left</p>

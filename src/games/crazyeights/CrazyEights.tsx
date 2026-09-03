@@ -5,6 +5,7 @@ import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
+import { GameRules } from '../../components/GameRules'
 import type { Suit } from '../../types/card'
 import { isPlayable, SUITS } from './crazyEightsLogic'
 import {
@@ -96,6 +97,14 @@ export function CrazyEights() {
           <ErrorNotice message={deck.error} onRetry={() => void newGame()} />
         </div>
       )}
+
+      <div className="mb-4">
+        <GameRules>
+          <p>Be first to play every card in your hand (you each start with seven). On your turn, play a card that matches the top of the discard pile by <strong>suit or rank</strong>, or play any <strong>8</strong> (wild) and name the next suit.</p>
+          <p>No legal card? Draw from the stock until you get one. If the stock runs out and you still can't play, pass — the stock reshuffles from the discard pile when it empties.</p>
+          <p>If both players pass with a dead deck, the game ends and the smaller hand wins.</p>
+        </GameRules>
+      </div>
 
       {dealing ? (
         <Loading label="Dealing…" />
