@@ -8,6 +8,7 @@ import { VideoPoker } from './games/videopoker/VideoPoker'
 import { CrazyEights } from './games/crazyeights/CrazyEights'
 import { Slapjack } from './games/slapjack/Slapjack'
 import { GoFish } from './games/gofish/GoFish'
+import { Trash } from './games/trash/Trash'
 import { Leaderboard } from './games/leaderboard/Leaderboard'
 
 export function App() {
@@ -23,6 +24,7 @@ export function App() {
       <Route path="/crazy-eights" element={<CrazyEights />} />
       <Route path="/slapjack" element={<Slapjack />} />
       <Route path="/go-fish" element={<GoFish />} />
+      <Route path="/trash" element={<Trash />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

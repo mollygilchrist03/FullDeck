@@ -83,6 +83,12 @@ export function Hub() {
           blurb="Ask the dealer for ranks and collect sets of four. More books than the dealer takes the game."
           glyph="♣"
         />
+        <GameCard
+          to="/trash"
+          title="Trash"
+          blurb="Race to fill a row of Ace-to-10. Queens are wild, Kings kill your turn. Win rounds to shrink your row."
+          glyph="♠"
+        />
       </div>
     </Layout>
   )
