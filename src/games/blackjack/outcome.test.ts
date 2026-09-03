@@ -31,6 +31,13 @@ describe('settle', () => {
   it('equal totals push', () => {
     expect(settle(hand('10', '8'), hand('10', '8'))).toBe('push')
   })
+
+  it('with playerNatural=false, a two-card 21 is an ordinary hand', () => {
+    // Split-hand 21 vs a dealer natural -> loss, not push.
+    expect(settle(hand('ACE', 'KING'), hand('ACE', 'QUEEN'), false)).toBe('loss')
+    // vs a dealer 20 -> just a win.
+    expect(settle(hand('ACE', 'KING'), hand('10', 'QUEEN'), false)).toBe('win')
+  })
 })
 
 describe('PAYOUT_MULTIPLIER', () => {

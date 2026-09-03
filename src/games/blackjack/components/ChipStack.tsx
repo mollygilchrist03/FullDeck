@@ -1,9 +1,10 @@
 interface ChipStackProps {
   bank: number
-  bet: number
+  /** Total chips committed across every hand plus insurance. */
+  committed: number
 }
 
-export function ChipStack({ bank, bet }: ChipStackProps) {
+export function ChipStack({ bank, committed }: ChipStackProps) {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-gold/40 bg-black/20 px-4 py-2">
       <div>
@@ -12,8 +13,8 @@ export function ChipStack({ bank, bet }: ChipStackProps) {
       </div>
       <div className="h-8 w-px bg-gold/30" />
       <div>
-        <p className="text-[0.65rem] uppercase tracking-widest text-gold/80">Bet</p>
-        <p className="text-lg font-bold tabular-nums text-casino">${bet}</p>
+        <p className="text-[0.65rem] uppercase tracking-widest text-gold/80">On table</p>
+        <p className="text-lg font-bold tabular-nums text-casino">${committed}</p>
       </div>
     </div>
   )

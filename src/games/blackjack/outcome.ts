@@ -13,12 +13,14 @@ export const PAYOUT_MULTIPLIER: Record<Outcome, number> = {
 
 /**
  * Settle a finished hand from the player's point of view.
- * Assumes the dealer has already finished drawing.
+ * Assumes the dealer has already finished drawing. `playerNatural` is false for
+ * hands formed by splitting — a two-card 21 there is an ordinary 21, not a
+ * blackjack, and loses to a dealer natural.
  */
-export function settle(player: Card[], dealer: Card[]): Outcome {
+export function settle(player: Card[], dealer: Card[], playerNatural = true): Outcome {
   const playerTotal = scoreHand(player).total
   const dealerTotal = scoreHand(dealer).total
-  const playerBJ = isBlackjack(player)
+  const playerBJ = playerNatural && isBlackjack(player)
   const dealerBJ = isBlackjack(dealer)
 
   if (playerBJ || dealerBJ) {
