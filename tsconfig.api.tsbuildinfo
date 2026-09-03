@@ -1,1 +1,0 @@
-{"root":["./api/scores.ts","./db/client.ts","./db/schema.ts","./drizzle.config.ts"],"version":"5.9.3"}
