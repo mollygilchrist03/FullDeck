@@ -1,0 +1,105 @@
+@import 'tailwindcss';
+
+/* ---- Full Deck theme: casino felt table ---- */
+@theme {
+  --color-felt: #0b4f3a; /* felt green — surfaces, nav */
+  --color-felt-deep: #0a3d2d; /* deeper felt — page background */
+  --color-gold: #c9a227; /* gold — accents, borders */
+  --color-casino: #e63946; /* casino red — CTAs, win states */
+  --color-card: #faf7f0; /* cream — card faces, text on dark */
+  --color-ink: #1a1a1a; /* near-black — body text on light */
+
+  --font-display: 'Georgia', 'Times New Roman', serif;
+
+  --animate-deal: deal 0.35s ease-out both;
+  --animate-pulse-match: pulse-match 0.6s ease-out;
+
+  @keyframes deal {
+    from {
+      opacity: 0;
+      transform: translateY(-18px) scale(0.92) rotate(-4deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1) rotate(0);
+    }
+  }
+
+  @keyframes pulse-match {
+    0% {
+      box-shadow: 0 0 0 0 rgba(201, 162, 39, 0);
+    }
+    35% {
+      box-shadow: 0 0 0 6px rgba(201, 162, 39, 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(201, 162, 39, 0);
+    }
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-felt-deep);
+  color: var(--color-card);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Radial felt sheen behind everything */
+#root {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.06), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, 0.35), transparent 55%);
+}
+
+/* ---- Card 3D flip primitives ---- */
+.card-scene {
+  perspective: 900px;
+}
+
+.card-flipper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.45s cubic-bezier(0.4, 0.1, 0.2, 1);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.card-flipper.is-face-down {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 0.55rem;
+  overflow: hidden;
+}
+
+.card-face--back {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-flipper {
+    transition-duration: 0.01ms;
+  }
+  [class*='animate-'] {
+    animation-duration: 0.01ms !important;
+  }
+}
