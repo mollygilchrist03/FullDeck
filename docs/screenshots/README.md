@@ -5,13 +5,17 @@ Drop the images the top-level README references here. `hub.png`,
 
 | File | Shot |
 | --- | --- |
-| `hub.png` | The game hub / landing screen with all five games |
+| `hub.png` | The game hub with all nine games |
 | `blackjack.png` | A Blackjack hand in progress — dealer hole card face-down, chip stack visible |
-| `memory.png` | A 6×6 Memory Match board mid-game with the move counter and timer |
-| `war.png` | War — the two piles, a battle flipped, the "war" state on a tie |
-| `high-low.png` | High-Low — one card up, higher/lower buttons, streak counter |
 | `video-poker.png` | Video Poker — five cards dealt, some held, the paytable open |
-| `crazy-eights.png` | Crazy Eights — your hand with legal cards highlighted, the discard pile and active suit |
+| `memory.png` | A 6×6 Memory Match board mid-game with the move counter and timer |
+| `war.png` | War — piles, a battle flipped, or the three-down / one-up war state |
+| `high-low.png` | High-Low — one card up, higher/lower buttons, streak counter |
+| `crazy-eights.png` | Crazy Eights — legal cards highlighted, the discard pile and active suit |
+| `slapjack.png` | Slapjack — a Jack on the centre pile, the Slap button |
+| `go-fish.png` | Go Fish — the ask-for-a-rank buttons and book chips |
+| `trash.png` | Trash — the two numbered rows, stock/discard, a card in hand |
+| `leaderboard.png` | The `/leaderboard` page with a game tab selected |
 
 Capture at ~1280px wide. A short GIF of each game being played is also worth
 adding for the portfolio writeup.

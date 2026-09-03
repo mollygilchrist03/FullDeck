@@ -3,13 +3,15 @@
 A small collection of classic card games built from scratch — the point isn't
 displaying card data, it's implementing the actual games: shuffling, dealing,
 hand scoring, dealer AI, win conditions, and the discrete state transitions each
-game runs on. Six games — Blackjack, Memory Match, War, High-Low, Video Poker, and Crazy
-Eights — share one foundation, and the interesting logic is factored into isolated
-pure functions with their own unit tests rather than tangled into components.
+game runs on. Nine games — Blackjack, Memory Match, War, High-Low, Video Poker,
+Crazy Eights, Slapjack, Go Fish, and Trash — share one foundation, and the
+interesting logic is factored into isolated pure functions with their own unit
+tests rather than tangled into components. Rules follow the Bicycle / Wikipedia
+references, and each game screen carries a matching "How to play" panel.
 
 **Live demo:** [full-deck-five.vercel.app](https://full-deck-five.vercel.app)
 
-![Game hub — the five games on the felt table](docs/screenshots/hub.png)
+![Game hub — the nine games on the felt table](docs/screenshots/hub.png)
 
 ![Blackjack — a hand in progress with the dealer's hole card face-down and the chip stack](docs/screenshots/blackjack.png)
 
@@ -17,11 +19,12 @@ pure functions with their own unit tests rather than tangled into components.
 
 ## What it does
 
-**Blackjack.** Place a bet from a chip stack, get dealt two cards against a
-dealer showing one, then hit or stand. Aces score as 1 or 11 dynamically, the
-dealer plays itself out by the book, and the hand settles to
-win / loss / push / blackjack with the payout applied to your stack (3:2 on a
-natural). Run out of chips and you can reset.
+**Blackjack.** Bet from a chip stack, get dealt two cards against a dealer
+showing one, then hit / stand / **double down** / **split** a pair (up to four
+hands, each with its own bet). If the dealer shows an ace you're offered
+**insurance**. Aces score as 1 or 11 dynamically, the dealer plays to 17 (S17),
+and each hand settles to win / loss / push / blackjack — 3:2 on a natural. Run
+out of chips and you can reset.
 
 **Memory Match.** A grid of face-down cards — 4×4 or 6×6 — flipped two at a time.
 Matches stay up with a brief pulse; a mismatch locks the board for a beat so you
@@ -30,9 +33,9 @@ run throughout, and clearing every pair shows a completion screen with your
 moves and time.
 
 **War.** The deck is split 26/26 and you flip a card each per battle — higher
-rank takes the pair, ties stake both cards and play continues until someone wins
-the pot. Won cards are shuffled back in (so games actually end), and the match is
-over when a player holds all 52 or can't produce a card.
+rank takes the pair. A tie means **war**: three cards face down and one face up
+per side, higher up-card sweeps the table (repeats on another tie). Won cards are
+shuffled back in so games terminate; the match ends when a player holds all 52.
 
 **High-Low.** One card face-up; call whether the next is higher or lower and
 build a streak. Aces are high, equal ranks are a push. Best streak for the
@@ -43,10 +46,23 @@ them, and draw replacements for the rest. The resulting five-card poker hand is
 evaluated and paid on a 9/6 schedule — right down to the max-bet royal-flush
 bonus.
 
-**Crazy Eights.** Heads-up against an AI. Deal seven each; on your turn play a
-card matching the discard's suit or rank, or an eight (wild — you name the new
-suit), otherwise draw. First to shed their hand wins. The stock recycles from
-the discard pile when it runs out.
+**Crazy Eights.** Heads-up against an AI. Deal seven each; play a card matching
+the discard's suit or rank, or an eight (wild — you name the new suit). No legal
+card means you draw until you get one (Bicycle rule); pass only when the deck is
+truly dead. First to shed their hand wins.
+
+**Slapjack.** The deck is split 26/26 and you alternate flipping to a centre
+pile. When a Jack lands, race the dealer to **slap** — the slapper takes the
+pile; a false slap forfeits a card. Collect all 52 to win.
+
+**Go Fish.** Deal seven each, rest to the stock. Ask the dealer for a rank you
+hold: a hit hands over every match and you ask again; a miss is "go fish". Book
+sets of four; most books when all 13 are made wins.
+
+**Trash (Garbage).** Fill a face-down row with Ace → 10 in order. Draw, slot the
+card into its position, swap up whatever was there and keep going. Queens are
+wild, Jacks and Kings end the turn. Clear the row to win the round; the winner
+lays one fewer card next round — win a round at one card to take the match.
 
 Every game draws a real, server-shuffled deck from the free, keyless
 [Deck of Cards API](https://deckofcardsapi.com/) rather than simulating a deck
@@ -54,12 +70,16 @@ in memory, and render card fronts straight from the API's image URLs (the
 [vector-playing-cards](https://code.google.com/archive/p/vector-playing-cards/)
 set it serves), with a CSS-drawn fallback if an image fails to load.
 
-**Leaderboard.** Each game reports one headline number to a shared,
-cross-visitor leaderboard at `/leaderboard` — peak bank (Blackjack), best 6×6
-time (Memory Match), longest streak (High-Low), fewest battles (War), biggest
-single win (Video Poker), cards left on the AI (Crazy Eights). Backed by a
-Postgres table behind a Vercel serverless function; the app runs fine without it
-(the API answers 503 and the UI says so).
+**Leaderboard.** Each game reports one headline number to a shared, cross-visitor
+leaderboard in the top nav — peak bank (Blackjack), best 6×6 time (Memory),
+longest streak (High-Low), fewest battles (War), biggest single win (Video
+Poker), cards left on the AI (Crazy Eights), fastest slap (Slapjack), books
+collected (Go Fish), turns to the match win (Trash). Backed by a Neon Postgres
+table behind a Vercel serverless function, with an
+[`obscenity`](https://github.com/jo3-l/obscenity)-based name filter (leetspeak,
+spacing, and confusable-unicode aware, with a false-positive whitelist).
+Client-side pre-check, server-side authority; the app still runs with no database
+attached (the API answers 503 and the UI says so).
 
 ## Notable engineering decisions
 
@@ -97,11 +117,32 @@ and free of any React or network concerns.
   ([`paytable.ts`](src/games/videopoker/paytable.ts)) is a separate lookup so
   the scoring and the economics stay independent.
 
-- **War is made to terminate.** Classic War with fixed card ordering can loop
-  forever; the pot is shuffled before it folds into the winner's pile
-  ([`src/games/war/warReducer.ts`](src/games/war/warReducer.ts)), and ties stake
-  into a shared pile rather than the three-face-down ritual — smaller state,
-  guaranteed end.
+- **Blackjack is a multi-hand state machine**
+  ([`src/games/blackjack/blackjackReducer.ts`](src/games/blackjack/blackjackReducer.ts)).
+  State is an array of hands with a per-hand bet and an active-hand pointer;
+  `split` inserts two hands in place, `double` doubles one and auto-stands, and
+  an `insurance` phase peeks the dealer before play. `settle()` takes a
+  `playerNatural` flag so a two-card 21 formed by splitting pays 1:1, not 3:2.
+
+- **War is made to terminate.** The real Bicycle rule — three cards face down,
+  one face up, higher up-card sweeps — but the pot is shuffled before it folds
+  into the winner's pile
+  ([`src/games/war/warReducer.ts`](src/games/war/warReducer.ts)), because classic
+  War with fixed card ordering can otherwise loop forever.
+
+- **Trash keeps the whole deck in reducer state.**
+  ([`src/games/trash/`](src/games/trash/)) so the placement chain (slot a card,
+  swap up the one underneath, play *that*, …), wilds, dead cards, the
+  round ladder (10 → 9 → … → 1), and the match win are all pure and testable —
+  no async draws mid-turn. `placementFor(card, size)` is the small function that
+  decides slot / wild / dead.
+
+- **A real profanity filter, not a wordlist grep.**
+  [`src/lib/profanity.ts`](src/lib/profanity.ts) wraps `obscenity`'s matcher with
+  leetspeak / confusable / repeated-character / separator transformers plus a
+  slur supplement, and its English whitelist keeps "assassin", "class", and
+  "Scunthorpe" clean. Shared by the client (instant feedback) and
+  [`api/scores.ts`](api/scores.ts) (the authority).
 
 - **Crazy Eights turn machine + AI**
   ([`src/games/crazyeights/`](src/games/crazyeights/)). Legality
@@ -114,11 +155,17 @@ and free of any React or network concerns.
   recycles from the discard pile, and a player with no move and nothing to draw
   passes.
 
-- **Reducers stay pure; the container owns the network.** Both games are
-  `useReducer` state machines (`DEAL`, `HIT`, `STAND`, `FLIP`, `RESOLVE`, …).
-  Every API call happens in the container and drawn cards are passed *into*
-  actions as payloads, so no reducer ever awaits anything and all of them are
-  directly unit-testable — see the reducer tests alongside each file.
+- **Reducers stay pure; the container owns the network.** Every game is a
+  `useReducer` state machine (`DEAL`, `HIT`, `STAND`, `FLIP`, `ASK`, `AI_STEP`,
+  …). API calls happen in the container and drawn cards are passed *into* actions
+  as payloads, so no reducer ever awaits anything and every one is directly
+  unit-testable. Games where the whole deck is dealt up front (Go Fish, Trash)
+  keep the stock in reducer state and are fully deterministic.
+
+- **The AI opponents are pure policies.** Crazy Eights (`chooseAiPlay`), Go Fish
+  (`chooseAiAsk`, with a small memory of what you've asked for), Trash (fill the
+  lowest open slot), and Slapjack (a randomised reaction delay) — each decides in
+  a plain function the container steps on a timer so the moves are watchable.
 
 - **`useDeck`** ([`src/hooks/useDeck.ts`](src/hooks/useDeck.ts)) caches the deck
   id for the session, auto-reshuffles when the deck runs low (repeated Blackjack
@@ -143,11 +190,11 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **110 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
+- **166 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
   outcome settlement, board building, card comparison, high-low judging, poker
-  evaluation, payouts, move legality, the Crazy Eights AI, leaderboard
-  validation/formatting, and every reducer transition. They need no network and
-  no DOM.
+  evaluation, payouts, blackjack split/double/insurance, war conservation, every
+  AI policy, the profanity filter, leaderboard validation/formatting, and every
+  reducer transition. They need no network and no DOM.
 
 ## Tech stack
 
@@ -156,11 +203,11 @@ and free of any React or network concerns.
 | Framework | React 19 + TypeScript (strict) |
 | Build | Vite |
 | Styling | Tailwind CSS v4 (palette defined in `@theme`) |
-| Routing | React Router — `/`, the six game routes, `/leaderboard` |
+| Routing | React Router — `/`, nine game routes, `/leaderboard` |
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest (pure-logic unit tests) |
 | Card data | Deck of Cards API (free, no key) |
-| Leaderboard | Vercel serverless function (`api/`) + Neon Postgres via Drizzle ORM |
+| Leaderboard | Vercel serverless function (`api/`) + Neon Postgres via Drizzle ORM; `obscenity` name filter |
 | Hosting | Vercel (static SPA + functions) |
 
 ## Local setup
@@ -185,21 +232,19 @@ serverless functions; [`vercel.json`](vercel.json) rewrites every non-`/api`
 path to `index.html` so the client router handles the routes on a hard refresh.
 The repo is connected to Vercel, so a push to `master` is a production deploy.
 
-**Leaderboard database.** Create a Postgres store in the Vercel project's
-**Storage** tab (or bring your own Neon project) and set `DATABASE_URL` in the
-project's environment variables, then run `npm run db:push` against it once to
-create the `scores` table. Until that's done the site still deploys and runs —
-the leaderboard just reports that it isn't configured.
+**Leaderboard database.** The live demo is wired to a Neon Postgres store
+(created from the Vercel project's **Storage** tab, which sets `DATABASE_URL`);
+`npm run db:push` created the `scores` table. To run your own, do the same and
+set `DATABASE_URL` for all environments. Until that's done the site still
+deploys and runs — the leaderboard just reports that it isn't configured.
 
 ## What's next
 
 Things worth adding if this grew past a portfolio piece:
 
-- More games on the same `useDeck` foundation — Go Fish and heads-up Texas
-  Hold'em (the poker evaluator already does most of the work) are the obvious
-  next ones.
+- Heads-up Texas Hold'em — the poker evaluator already does most of the work.
 - Leaderboard hardening — a bot deterrent beyond the per-instance rate limit,
   and server-side plausibility checks tighter than the current range bounds.
 - Component/interaction tests — the logic is covered, but the assembled UI
-  currently leans on `tsc`, `vite build`, and manual play.
+  currently leans on `tsc`, `vite build`, and headless-Chromium screenshots.
 - Sound and haptics on deal / flip / win.
