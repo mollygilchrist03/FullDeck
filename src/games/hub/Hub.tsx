@@ -53,6 +53,12 @@ export function Hub() {
           blurb="Split the deck and flip. High card takes the pair, ties mean war. First to hold all 52 wins."
           glyph="♦"
         />
+        <GameCard
+          to="/high-low"
+          title="High-Low"
+          blurb="One card up. Guess whether the next is higher or lower and build the longest streak you can."
+          glyph="♣"
+        />
       </div>
     </Layout>
   )
