@@ -11,6 +11,7 @@ Drop the images the top-level README references here. `hub.png`,
 | `war.png` | War — the two piles, a battle flipped, the "war" state on a tie |
 | `high-low.png` | High-Low — one card up, higher/lower buttons, streak counter |
 | `video-poker.png` | Video Poker — five cards dealt, some held, the paytable open |
+| `crazy-eights.png` | Crazy Eights — your hand with legal cards highlighted, the discard pile and active suit |
 
 Capture at ~1280px wide. A short GIF of each game being played is also worth
 adding for the portfolio writeup.

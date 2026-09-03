@@ -3,8 +3,8 @@
 A small collection of classic card games built from scratch — the point isn't
 displaying card data, it's implementing the actual games: shuffling, dealing,
 hand scoring, dealer AI, win conditions, and the discrete state transitions each
-game runs on. Five games — Blackjack, Memory Match, War, High-Low, and Video
-Poker — share one foundation, and the interesting logic is factored into isolated
+game runs on. Six games — Blackjack, Memory Match, War, High-Low, Video Poker, and Crazy
+Eights — share one foundation, and the interesting logic is factored into isolated
 pure functions with their own unit tests rather than tangled into components.
 
 **Live demo:** [full-deck-five.vercel.app](https://full-deck-five.vercel.app)
@@ -42,6 +42,11 @@ session is tracked.
 them, and draw replacements for the rest. The resulting five-card poker hand is
 evaluated and paid on a 9/6 schedule — right down to the max-bet royal-flush
 bonus.
+
+**Crazy Eights.** Heads-up against an AI. Deal seven each; on your turn play a
+card matching the discard's suit or rank, or an eight (wild — you name the new
+suit), otherwise draw. First to shed their hand wins. The stock recycles from
+the discard pile when it runs out.
 
 Every game draws a real, server-shuffled deck from the free, keyless
 [Deck of Cards API](https://deckofcardsapi.com/) rather than simulating a deck
@@ -91,6 +96,17 @@ and free of any React or network concerns.
   into a shared pile rather than the three-face-down ritual — smaller state,
   guaranteed end.
 
+- **Crazy Eights turn machine + AI**
+  ([`src/games/crazyeights/`](src/games/crazyeights/)). Legality
+  (`isPlayable`: eight, or suit, or rank — against the *active* suit, which an
+  eight can change) and the opponent's policy (`chooseAiPlay`: play a matching
+  non-eight, save eights, otherwise play an eight naming your strongest suit) are
+  pure. The reducer runs `playerTurn → awaitSuit → aiTurn → …` and the AI plays
+  one `AI_STEP` at a time on a timer, so drawing several cards before a play is
+  visible rather than instant. Guarantees against a stuck game: the stock
+  recycles from the discard pile, and a player with no move and nothing to draw
+  passes.
+
 - **Reducers stay pure; the container owns the network.** Both games are
   `useReducer` state machines (`DEAL`, `HIT`, `STAND`, `FLIP`, `RESOLVE`, …).
   Every API call happens in the container and drawn cards are passed *into*
@@ -110,10 +126,10 @@ and free of any React or network concerns.
   `backface-hidden` faces and a `rotateY(180deg)` toggle — no layout shift, so it
   stays smooth on mobile.
 
-- **81 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
+- **100 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
   outcome settlement, board building, card comparison, high-low judging, poker
-  evaluation, payouts, and every reducer transition. They need no network and no
-  DOM.
+  evaluation, payouts, move legality, the Crazy Eights AI, and every reducer
+  transition. They need no network and no DOM.
 
 ## Tech stack
 
@@ -122,7 +138,7 @@ and free of any React or network concerns.
 | Framework | React 19 + TypeScript (strict) |
 | Build | Vite |
 | Styling | Tailwind CSS v4 (palette defined in `@theme`) |
-| Routing | React Router — `/`, `/blackjack`, `/memory`, `/war`, `/high-low`, `/video-poker` |
+| Routing | React Router — `/`, `/blackjack`, `/memory`, `/war`, `/high-low`, `/video-poker`, `/crazy-eights` |
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest (pure-logic unit tests) |
 | Data | Deck of Cards API (free, no key) |

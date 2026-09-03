@@ -65,6 +65,12 @@ export function Hub() {
           blurb="Jacks or Better. Deal five, hold what you want, draw the rest, and get paid on the poker hand."
           glyph="♠"
         />
+        <GameCard
+          to="/crazy-eights"
+          title="Crazy Eights"
+          blurb="Shed your hand first. Match the suit or rank, eights are wild — against an opponent that plays its own game."
+          glyph="♥"
+        />
       </div>
     </Layout>
   )
