@@ -8,9 +8,11 @@ import { ScoreSubmit } from '../../components/ScoreSubmit'
 import type { Suit } from '../../types/card'
 import { isPlayable, SUITS } from './crazyEightsLogic'
 import {
+  canDraw,
   crazyEightsReducer,
   HAND_SIZE,
   initCrazyEights,
+  playerHasMove,
   topCard,
 } from './crazyEightsReducer'
 
@@ -75,7 +77,9 @@ export function CrazyEights() {
   const myTurn = state.phase === 'playerTurn'
   const legal = (i: number) =>
     top ? isPlayable(state.playerHand[i], top, state.activeSuit) : false
-  const hasLegalMove = state.playerHand.some((_, i) => legal(i))
+  const hasMove = myTurn && playerHasMove(state)
+  const mustDraw = myTurn && !hasMove && canDraw(state)
+  const mustPass = myTurn && !hasMove && !canDraw(state)
   const over = state.phase === 'gameover'
 
   return (
@@ -115,8 +119,8 @@ export function CrazyEights() {
           <div className="flex items-center gap-6">
             <button
               type="button"
-              onClick={() => myTurn && dispatch({ type: 'DRAW' })}
-              disabled={!myTurn}
+              onClick={() => dispatch({ type: 'DRAW' })}
+              disabled={!mustDraw}
               className="flex flex-col items-center gap-1 disabled:opacity-60"
               aria-label="Draw a card"
             >
@@ -182,20 +186,26 @@ export function CrazyEights() {
 
           {/* Controls */}
           {myTurn && (
-            <div className="flex gap-3">
-              <Button variant="ghost" onClick={() => dispatch({ type: 'DRAW' })}>
-                Draw
-              </Button>
-              <Button
-                variant="accent"
-                onClick={() => dispatch({ type: 'PASS' })}
-                disabled={!state.drewThisTurn}
-              >
-                Pass
-              </Button>
-              {!hasLegalMove && !state.drewThisTurn && (
-                <span className="self-center text-xs text-card/60">No move — draw.</span>
-              )}
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={() => dispatch({ type: 'DRAW' })} disabled={!mustDraw}>
+                  Draw
+                </Button>
+                <Button
+                  variant="accent"
+                  onClick={() => dispatch({ type: 'PASS' })}
+                  disabled={!mustPass}
+                >
+                  Pass
+                </Button>
+              </div>
+              <p className="text-xs text-card/60">
+                {hasMove
+                  ? 'Play one of the highlighted cards.'
+                  : mustDraw
+                    ? 'No legal card — draw until you can play.'
+                    : 'Nothing to play or draw — pass.'}
+              </p>
             </div>
           )}
 

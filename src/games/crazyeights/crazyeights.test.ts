@@ -105,14 +105,30 @@ describe('crazyEightsReducer', () => {
     expect(s.winner).toBe('player')
   })
 
-  it('DRAW takes the top of stock and unlocks PASS', () => {
-    let s = setup()
-    expect(crazyEightsReducer(s, { type: 'PASS' })).toBe(s) // can't pass before drawing
-    s = crazyEightsReducer(s, { type: 'DRAW' })
-    expect(s.playerHand).toHaveLength(4)
-    expect(s.drewThisTurn).toBe(true)
-    s = crazyEightsReducer(s, { type: 'PASS' })
-    expect(s.phase).toBe('aiTurn')
+  it('ignores DRAW and PASS while the player has a legal move', () => {
+    const s = setup() // hand can play 7C, 8D, or 4H
+    expect(crazyEightsReducer(s, { type: 'DRAW' })).toBe(s)
+    expect(crazyEightsReducer(s, { type: 'PASS' })).toBe(s)
+  })
+
+  it('DRAW works only with no legal move, and PASS only when the deck is dead', () => {
+    const stuck = setup({
+      playerHand: [card('4', 'CLUBS'), card('9', 'SPADES')],
+      activeSuit: 'HEARTS',
+      stock: [card('5', 'DIAMONDS')],
+      discard: [card('7', 'HEARTS')],
+    })
+    // Stock has a card, so you must draw, not pass.
+    expect(crazyEightsReducer(stuck, { type: 'PASS' })).toBe(stuck)
+    const drawn = crazyEightsReducer(stuck, { type: 'DRAW' })
+    expect(drawn.playerHand).toHaveLength(3)
+
+    // Now nothing left to draw -> pass is allowed.
+    const dead = { ...stuck, stock: [] }
+    expect(crazyEightsReducer(dead, { type: 'DRAW' })).toBe(dead)
+    const passed = crazyEightsReducer(dead, { type: 'PASS' })
+    expect(passed.phase).toBe('aiTurn')
+    expect(passed.passStreak).toBe(1)
   })
 
   it('AI_STEP plays a legal card and returns the turn', () => {
@@ -152,7 +168,6 @@ describe('crazyEightsReducer', () => {
     // Neither can move, nothing to draw.
     let s = setup({
       phase: 'playerTurn',
-      drewThisTurn: true,
       playerHand: [card('4', 'CLUBS')],
       aiHand: [card('9', 'SPADES'), card('10', 'SPADES')],
       activeSuit: 'HEARTS',

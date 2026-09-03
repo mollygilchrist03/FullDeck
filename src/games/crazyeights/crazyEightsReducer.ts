@@ -1,6 +1,6 @@
 import type { Card, Suit } from '../../types/card'
 import { shuffle } from '../../lib/shuffle'
-import { chooseAiPlay, isPlayable } from './crazyEightsLogic'
+import { chooseAiPlay, isPlayable, playableCards } from './crazyEightsLogic'
 
 export const HAND_SIZE = 7
 
@@ -19,8 +19,6 @@ export interface CrazyEightsState {
   winner: 'player' | 'ai' | null
   /** True when the game ended with neither hand empty (a locked-up deck). */
   stalemate: boolean
-  /** The player has drawn at least once this turn and may now pass. */
-  drewThisTurn: boolean
   /** Consecutive passes with no card played or drawn — two in a row ends the game. */
   passStreak: number
   /** Increments on every AI_STEP — drives the container's "keep stepping" effect. */
@@ -79,11 +77,20 @@ export function initCrazyEights(): CrazyEightsState {
     phase: 'playerTurn',
     winner: null,
     stalemate: false,
-    drewThisTurn: false,
     passStreak: 0,
     aiSteps: 0,
     log: [],
   }
+}
+
+/** Whether the player has a legal card to play right now. */
+export function playerHasMove(s: CrazyEightsState): boolean {
+  return s.discard.length > 0 && playableCards(s.playerHand, topCard(s), s.activeSuit).length > 0
+}
+
+/** Whether there is anything left to draw (stock, or a recyclable discard pile). */
+export function canDraw(s: CrazyEightsState): boolean {
+  return s.stock.length > 0 || s.discard.length > 1
 }
 
 const push = (log: string[], line: string): string[] => [...log, line].slice(-6)
@@ -152,7 +159,6 @@ export function crazyEightsReducer(
         ...base,
         activeSuit: card.suit,
         phase: 'aiTurn',
-        drewThisTurn: false,
         log: push(state.log, `You played ${cardLabel(card)}.`),
       }
     }
@@ -163,7 +169,6 @@ export function crazyEightsReducer(
         ...state,
         activeSuit: action.suit,
         phase: 'aiTurn',
-        drewThisTurn: false,
         passStreak: 0,
         log: push(state.log, `Suit is now ${SUIT_TITLE[action.suit]}.`),
       }
@@ -171,32 +176,32 @@ export function crazyEightsReducer(
 
     case 'DRAW': {
       if (state.phase !== 'playerTurn') return state
+      // Bicycle rule: only draw when you have no legal play.
+      if (playerHasMove(state)) return state
       const { stock, discard } = replenish(state.stock, state.discard)
-      if (stock.length === 0) {
-        return { ...state, drewThisTurn: true, log: push(state.log, 'Nothing left to draw — pass.') }
-      }
+      if (stock.length === 0) return state
       const [drawn, ...rest] = stock
       return {
         ...state,
         stock: rest,
         discard,
         playerHand: [...state.playerHand, drawn],
-        drewThisTurn: true,
         passStreak: 0,
         log: push(state.log, 'You drew a card.'),
       }
     }
 
     case 'PASS': {
-      if (state.phase !== 'playerTurn' || !state.drewThisTurn) return state
+      if (state.phase !== 'playerTurn') return state
+      // You may only pass when you genuinely cannot play and cannot draw.
+      if (playerHasMove(state) || canDraw(state)) return state
       const passStreak = state.passStreak + 1
       if (passStreak >= 2) return stalemateEnd(state, state)
       return {
         ...state,
         phase: 'aiTurn',
-        drewThisTurn: false,
         passStreak,
-        log: push(state.log, 'You pass.'),
+        log: push(state.log, 'You pass — nothing to play or draw.'),
       }
     }
 
@@ -222,7 +227,6 @@ export function crazyEightsReducer(
           ...base,
           activeSuit: play.card.rank === '8' ? play.suit! : play.card.suit,
           phase: 'playerTurn',
-          drewThisTurn: false,
           log: push(state.log, `AI played ${cardLabel(play.card)}${wildNote}.`),
         }
       }
@@ -235,7 +239,6 @@ export function crazyEightsReducer(
         return {
           ...stepped,
           phase: 'playerTurn',
-          drewThisTurn: false,
           passStreak,
           log: push(state.log, 'AI has no move — passes.'),
         }
