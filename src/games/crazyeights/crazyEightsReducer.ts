@@ -17,8 +17,12 @@ export interface CrazyEightsState {
   activeSuit: Suit
   phase: CrazyEightsPhase
   winner: 'player' | 'ai' | null
+  /** True when the game ended with neither hand empty (a locked-up deck). */
+  stalemate: boolean
   /** The player has drawn at least once this turn and may now pass. */
   drewThisTurn: boolean
+  /** Consecutive passes with no card played or drawn — two in a row ends the game. */
+  passStreak: number
   /** Increments on every AI_STEP — drives the container's "keep stepping" effect. */
   aiSteps: number
   /** Newest-last feed of what just happened. */
@@ -74,7 +78,9 @@ export function initCrazyEights(): CrazyEightsState {
     activeSuit: 'SPADES',
     phase: 'playerTurn',
     winner: null,
+    stalemate: false,
     drewThisTurn: false,
+    passStreak: 0,
     aiSteps: 0,
     log: [],
   }
@@ -87,6 +93,22 @@ function replenish(stock: Card[], discard: Card[]): { stock: Card[]; discard: Ca
   if (stock.length > 0 || discard.length <= 1) return { stock, discard }
   const top = discard[discard.length - 1]
   return { stock: shuffle(discard.slice(0, -1)), discard: [top] }
+}
+
+/** Two passes in a row and nobody can move — fewest cards wins, player takes ties. */
+function stalemateEnd(state: CrazyEightsState, base: CrazyEightsState): CrazyEightsState {
+  const winner: 'player' | 'ai' =
+    state.playerHand.length <= state.aiHand.length ? 'player' : 'ai'
+  return {
+    ...base,
+    phase: 'gameover',
+    winner,
+    stalemate: true,
+    log: push(
+      state.log,
+      `Deadlock — nobody can move. Fewest cards wins, so ${winner === 'player' ? 'you win' : 'the AI wins'}.`,
+    ),
+  }
 }
 
 export function crazyEightsReducer(
@@ -113,30 +135,21 @@ export function crazyEightsReducer(
 
       const playerHand = state.playerHand.filter((_, i) => i !== action.index)
       const discard = [...state.discard, card]
+      const base = { ...state, playerHand, discard, passStreak: 0 }
 
       if (playerHand.length === 0) {
         return {
-          ...state,
-          playerHand,
-          discard,
+          ...base,
           phase: 'gameover',
           winner: 'player',
           log: push(state.log, `You played ${cardLabel(card)} and went out — you win!`),
         }
       }
       if (card.rank === '8') {
-        return {
-          ...state,
-          playerHand,
-          discard,
-          phase: 'awaitSuit',
-          log: push(state.log, `You played an 8 — name a suit.`),
-        }
+        return { ...base, phase: 'awaitSuit', log: push(state.log, `You played an 8 — name a suit.`) }
       }
       return {
-        ...state,
-        playerHand,
-        discard,
+        ...base,
         activeSuit: card.suit,
         phase: 'aiTurn',
         drewThisTurn: false,
@@ -151,6 +164,7 @@ export function crazyEightsReducer(
         activeSuit: action.suit,
         phase: 'aiTurn',
         drewThisTurn: false,
+        passStreak: 0,
         log: push(state.log, `Suit is now ${SUIT_TITLE[action.suit]}.`),
       }
     }
@@ -168,13 +182,22 @@ export function crazyEightsReducer(
         discard,
         playerHand: [...state.playerHand, drawn],
         drewThisTurn: true,
+        passStreak: 0,
         log: push(state.log, 'You drew a card.'),
       }
     }
 
     case 'PASS': {
       if (state.phase !== 'playerTurn' || !state.drewThisTurn) return state
-      return { ...state, phase: 'aiTurn', drewThisTurn: false, log: push(state.log, 'You pass.') }
+      const passStreak = state.passStreak + 1
+      if (passStreak >= 2) return stalemateEnd(state, state)
+      return {
+        ...state,
+        phase: 'aiTurn',
+        drewThisTurn: false,
+        passStreak,
+        log: push(state.log, 'You pass.'),
+      }
     }
 
     case 'AI_STEP': {
@@ -183,13 +206,12 @@ export function crazyEightsReducer(
       const play = chooseAiPlay(state.aiHand, topCard(state), state.activeSuit)
 
       if (play) {
-        const aiHand = state.aiHand.filter((c) => c !== play.card)
+        const aiHand = state.aiHand.filter((c) => c.code !== play.card.code)
         const discard = [...state.discard, play.card]
+        const base = { ...stepped, aiHand, discard, passStreak: 0 }
         if (aiHand.length === 0) {
           return {
-            ...stepped,
-            aiHand,
-            discard,
+            ...base,
             phase: 'gameover',
             winner: 'ai',
             log: push(state.log, `AI played ${cardLabel(play.card)} and went out — you lose.`),
@@ -197,9 +219,7 @@ export function crazyEightsReducer(
         }
         const wildNote = play.card.rank === '8' ? ` and named ${SUIT_TITLE[play.suit!]}` : ''
         return {
-          ...stepped,
-          aiHand,
-          discard,
+          ...base,
           activeSuit: play.card.rank === '8' ? play.suit! : play.card.suit,
           phase: 'playerTurn',
           drewThisTurn: false,
@@ -210,10 +230,13 @@ export function crazyEightsReducer(
       // No play — draw one, or pass if the deck is truly exhausted.
       const { stock, discard } = replenish(state.stock, state.discard)
       if (stock.length === 0) {
+        const passStreak = state.passStreak + 1
+        if (passStreak >= 2) return stalemateEnd(state, stepped)
         return {
           ...stepped,
           phase: 'playerTurn',
           drewThisTurn: false,
+          passStreak,
           log: push(state.log, 'AI has no move — passes.'),
         }
       }
@@ -223,6 +246,7 @@ export function crazyEightsReducer(
         stock: rest,
         discard,
         aiHand: [...state.aiHand, drawn],
+        passStreak: 0,
         log: push(state.log, 'AI drew a card.'),
       }
     }

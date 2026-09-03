@@ -53,6 +53,6 @@ export function chooseAiPlay(hand: Card[], top: Card, activeSuit: Suit): AiPlay 
   }
 
   const eight = playable[0]
-  const remaining = hand.filter((c) => c !== eight)
+  const remaining = hand.filter((c) => c.code !== eight.code)
   return { card: eight, suit: strongestSuit(remaining) }
 }

@@ -202,9 +202,15 @@ export function CrazyEights() {
           {over && (
             <div className="flex flex-col items-center gap-3">
               <p className="font-display text-xl text-gold">
-                {state.winner === 'player' ? 'You went out — you win!' : 'The AI went out. You lose.'}
+                {state.stalemate
+                  ? state.winner === 'player'
+                    ? 'Deadlock — you had fewer cards. You win.'
+                    : 'Deadlock — the AI had fewer cards. You lose.'
+                  : state.winner === 'player'
+                    ? 'You went out — you win!'
+                    : 'The AI went out. You lose.'}
               </p>
-              {state.winner === 'player' && state.aiHand.length >= 1 && (
+              {!state.stalemate && state.winner === 'player' && state.aiHand.length >= 1 && (
                 <ScoreSubmit game="crazy-eights" score={state.aiHand.length} />
               )}
               <Button size="lg" variant="gold" onClick={() => void newGame()}>

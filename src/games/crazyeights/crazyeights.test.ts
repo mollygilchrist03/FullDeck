@@ -145,6 +145,40 @@ describe('crazyEightsReducer', () => {
     })
     const s = crazyEightsReducer(stuck, { type: 'AI_STEP' })
     expect(s.phase).toBe('playerTurn')
+    expect(s.passStreak).toBe(1)
+  })
+
+  it('ends in a stalemate when both sides pass with a dead deck', () => {
+    // Neither can move, nothing to draw.
+    let s = setup({
+      phase: 'playerTurn',
+      drewThisTurn: true,
+      playerHand: [card('4', 'CLUBS')],
+      aiHand: [card('9', 'SPADES'), card('10', 'SPADES')],
+      activeSuit: 'HEARTS',
+      stock: [],
+      discard: [card('7', 'HEARTS')],
+    })
+    s = crazyEightsReducer(s, { type: 'PASS' }) // player pass -> aiTurn, passStreak 1
+    expect(s.phase).toBe('aiTurn')
+    s = crazyEightsReducer(s, { type: 'AI_STEP' }) // AI pass -> passStreak 2 -> gameover
+    expect(s.phase).toBe('gameover')
+    expect(s.stalemate).toBe(true)
+    expect(s.winner).toBe('player') // fewer cards (1 vs 2)
+  })
+
+  it('a successful draw between passes clears the deadlock counter', () => {
+    let s = setup({
+      phase: 'aiTurn',
+      aiHand: [card('4', 'CLUBS')],
+      activeSuit: 'HEARTS',
+      stock: [],
+      discard: [card('7', 'HEARTS'), card('2', 'CLUBS')],
+      passStreak: 1,
+    })
+    // Stock is empty but the discard recycles, so the AI draws instead of passing.
+    s = crazyEightsReducer(s, { type: 'AI_STEP' })
+    expect(s.passStreak).toBe(0)
   })
 
   it('AI going out ends the game', () => {
