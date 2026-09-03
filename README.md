@@ -3,17 +3,17 @@
 A small collection of classic card games built from scratch — the point isn't
 displaying card data, it's implementing the actual games: shuffling, dealing,
 hand scoring, dealer AI, win conditions, and the discrete state transitions each
-game runs on. Two games (Blackjack and Memory Match) share one foundation, and
-the interesting logic is factored into isolated pure functions with their own
-unit tests rather than tangled into components.
+game runs on. Five games — Blackjack, Memory Match, War, High-Low, and Video
+Poker — share one foundation, and the interesting logic is factored into isolated
+pure functions with their own unit tests rather than tangled into components.
 
 **Live demo:** [full-deck-five.vercel.app](https://full-deck-five.vercel.app)
 
-![Game hub — choose Blackjack or Memory Match on the felt table](docs/screenshots/hub.png)
+![Game hub — the five games on the felt table](docs/screenshots/hub.png)
 
 ![Blackjack — a hand in progress with the dealer's hole card face-down and the chip stack](docs/screenshots/blackjack.png)
 
-![Memory Match — a 6×6 board mid-game with the move counter and timer](docs/screenshots/memory.png)
+![Video Poker — five cards dealt, two held, the Jacks-or-Better paytable below](docs/screenshots/video-poker.png)
 
 ## What it does
 
@@ -29,7 +29,21 @@ can't click a third card mid-comparison, then flips back. Move counter and timer
 run throughout, and clearing every pair shows a completion screen with your
 moves and time.
 
-Both games draw a real, server-shuffled deck from the free, keyless
+**War.** The deck is split 26/26 and you flip a card each per battle — higher
+rank takes the pair, ties stake both cards and play continues until someone wins
+the pot. Won cards are shuffled back in (so games actually end), and the match is
+over when a player holds all 52 or can't produce a card.
+
+**High-Low.** One card face-up; call whether the next is higher or lower and
+build a streak. Aces are high, equal ranks are a push. Best streak for the
+session is tracked.
+
+**Video Poker (Jacks or Better).** Bet 1–5 credits, get five cards, hold any of
+them, and draw replacements for the rest. The resulting five-card poker hand is
+evaluated and paid on a 9/6 schedule — right down to the max-bet royal-flush
+bonus.
+
+Every game draws a real, server-shuffled deck from the free, keyless
 [Deck of Cards API](https://deckofcardsapi.com/) rather than simulating a deck
 in memory, and render card fronts straight from the API's image URLs (the
 [vector-playing-cards](https://code.google.com/archive/p/vector-playing-cards/)
@@ -62,6 +76,21 @@ and free of any React or network concerns.
   is ignored. A timed `RESOLVE` action clears the pair. Small detail, but it's
   the kind of state-management bug that's obvious once it bites.
 
+- **A reusable poker-hand evaluator**
+  ([`src/games/videopoker/pokerHand.ts`](src/games/videopoker/pokerHand.ts)).
+  `evaluateHand(cards)` reduces five cards to a category with an ordered set of
+  checks — flush and straight flags plus rank-multiplicity shape — handling both
+  the ace-high straight and the A-2-3-4-5 wheel, and distinguishing a low pair
+  from a paying pair of jacks. The paytable
+  ([`paytable.ts`](src/games/videopoker/paytable.ts)) is a separate lookup so
+  the scoring and the economics stay independent.
+
+- **War is made to terminate.** Classic War with fixed card ordering can loop
+  forever; the pot is shuffled before it folds into the winner's pile
+  ([`src/games/war/warReducer.ts`](src/games/war/warReducer.ts)), and ties stake
+  into a shared pile rather than the three-face-down ritual — smaller state,
+  guaranteed end.
+
 - **Reducers stay pure; the container owns the network.** Both games are
   `useReducer` state machines (`DEAL`, `HIT`, `STAND`, `FLIP`, `RESOLVE`, …).
   Every API call happens in the container and drawn cards are passed *into*
@@ -81,9 +110,10 @@ and free of any React or network concerns.
   `backface-hidden` faces and a `rotateY(180deg)` toggle — no layout shift, so it
   stays smooth on mobile.
 
-- **38 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
-  outcome settlement, board building, and every reducer transition. They need no
-  network and no DOM.
+- **81 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
+  outcome settlement, board building, card comparison, high-low judging, poker
+  evaluation, payouts, and every reducer transition. They need no network and no
+  DOM.
 
 ## Tech stack
 
@@ -92,7 +122,7 @@ and free of any React or network concerns.
 | Framework | React 19 + TypeScript (strict) |
 | Build | Vite |
 | Styling | Tailwind CSS v4 (palette defined in `@theme`) |
-| Routing | React Router — `/`, `/blackjack`, `/memory` |
+| Routing | React Router — `/`, `/blackjack`, `/memory`, `/war`, `/high-low`, `/video-poker` |
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest (pure-logic unit tests) |
 | Data | Deck of Cards API (free, no key) |
@@ -111,19 +141,19 @@ npm run lint
 ## Deployment
 
 App → Vercel, framework preset **Vite**. [`vercel.json`](vercel.json) rewrites
-every path to `index.html` so the client router handles `/blackjack` and
-`/memory` on a hard refresh. The repo is connected to Vercel, so a push to
-`master` is a production deploy. No environment variables — the card API is
-keyless.
+every path to `index.html` so the client router handles the game routes on a
+hard refresh. The repo is connected to Vercel, so a push to `master` is a
+production deploy. No environment variables — the card API is keyless.
 
 ## What's next
 
 Things worth adding if this grew past a portfolio piece:
 
-- A third game on the same `useDeck` foundation (War and Go Fish are the obvious
-  next ones).
-- Persisted best scores for Memory Match and a running Blackjack bankroll —
-  `localStorage` first, a backend only if it ever needs to be shared.
+- More games on the same `useDeck` foundation — Go Fish and heads-up Texas
+  Hold'em (the poker evaluator already does most of the work) are the obvious
+  next ones.
+- Persisted best scores and bankrolls — `localStorage` first, a backend only if
+  it ever needs to be shared.
 - Component/interaction tests — the logic is covered, but the assembled UI
   currently leans on `tsc`, `vite build`, and manual play.
 - Sound and haptics on deal / flip / win.
