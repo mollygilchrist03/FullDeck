@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm'
-import { getDb, isDbConfigured } from '../db/client'
-import { scores } from '../db/schema'
+import { getDb, isDbConfigured } from '../db/client.js'
+import { scores } from '../db/schema.js'
 import {
   GAMES,
   isGameKey,
   isValidScore,
   sanitizeName,
   type GameKey,
-} from '../src/lib/leaderboard'
+} from '../src/lib/leaderboard.js'
 
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 50
