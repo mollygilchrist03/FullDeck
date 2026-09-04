@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useMuted } from '../hooks/useMuted'
+import { toggleMuted } from '../lib/soundSettings'
 
 interface LayoutProps {
   /** Shown in the top bar; omit on the hub. */
@@ -13,6 +15,7 @@ export function Layout({ title, action, children }: LayoutProps) {
   const path = useLocation().pathname
   const onLeaderboard = path === '/leaderboard'
   const onMultiplayer = path === '/multiplayer' || path.startsWith('/room/')
+  const muted = useMuted()
 
   return (
     <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 pb-36 pt-4 sm:pb-8">
@@ -32,6 +35,15 @@ export function Layout({ title, action, children }: LayoutProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleMuted}
+            className="rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5"
+            aria-label={muted ? 'Unmute sound and haptics' : 'Mute sound and haptics'}
+            aria-pressed={muted}
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
           {!onMultiplayer && (
             <Link
               to="/multiplayer"
