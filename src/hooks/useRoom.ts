@@ -50,6 +50,8 @@ export async function joinRoom(code: string, name: string): Promise<void> {
 interface UseRoom {
   room: RoomView | null
   error: string | null
+  /** True while one of our own actions is in flight — disable buttons on this. */
+  sending: boolean
   send: (action: unknown) => Promise<void>
   start: () => Promise<void>
   rematch: () => Promise<void>
@@ -59,6 +61,7 @@ interface UseRoom {
 export function useRoom(code: string): UseRoom {
   const [room, setRoom] = useState<RoomView | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
   const versionRef = useRef(-1)
   const seatIdRef = useRef<string | null>(null)
 
@@ -106,15 +109,20 @@ export function useRoom(code: string): UseRoom {
 
   const op = useCallback(
     async (payload: Record<string, unknown>) => {
-      const data = await postJson(`/api/rooms/${code}`, {
-        ...payload,
-        seatId: seatIdRef.current,
-      })
-      // action/start return a fresh view; a 409 resync carries `room`.
-      const next = (data.room ?? data) as RoomView
-      if (next && typeof next.version === 'number') {
-        versionRef.current = next.version
-        setRoom(next)
+      setSending(true)
+      try {
+        const data = await postJson(`/api/rooms/${code}`, {
+          ...payload,
+          seatId: seatIdRef.current,
+        })
+        // action/start return a fresh view; a 409 resync carries `room`.
+        const next = (data.room ?? data) as RoomView
+        if (next && typeof next.version === 'number') {
+          versionRef.current = next.version
+          setRoom(next)
+        }
+      } finally {
+        setSending(false)
       }
     },
     [code],
@@ -123,6 +131,7 @@ export function useRoom(code: string): UseRoom {
   return {
     room,
     error,
+    sending,
     send: (action) => op({ op: 'action', action }),
     start: () => op({ op: 'start' }),
     rematch: () => op({ op: 'rematch' }),

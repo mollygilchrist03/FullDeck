@@ -39,7 +39,7 @@ function ShareLine({ code }: { code: string }) {
 
 export function Room() {
   const code = normalizeCode(useParams().code ?? '')
-  const { room, error, send, start, rematch } = useRoom(code)
+  const { room, error, sending, send, start, rematch } = useRoom(code)
   const [name, setName] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinErr, setJoinErr] = useState<string | null>(null)
@@ -115,7 +115,7 @@ export function Room() {
             <Button
               size="lg"
               variant="gold"
-              disabled={room.seats.some((s) => s === null)}
+              disabled={sending || room.seats.some((s) => s === null)}
               onClick={() => void start()}
             >
               {room.seats.some((s) => s === null) ? 'Waiting for player 2…' : 'Start game'}
@@ -126,9 +126,14 @@ export function Room() {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-5">
-          <MpBoard view={room} send={(a) => void send(a)} onRematch={() => void rematch()} />
+          <MpBoard
+            view={room}
+            send={(a) => void send(a)}
+            onRematch={() => void rematch()}
+            sending={sending}
+          />
           {room.phase === 'done' && room.youHost && (
-            <Button variant="gold" onClick={() => void rematch()}>
+            <Button variant="gold" disabled={sending} onClick={() => void rematch()}>
               Rematch
             </Button>
           )}

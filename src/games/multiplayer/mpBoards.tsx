@@ -13,23 +13,28 @@ export interface MpBoardProps {
   view: RoomView
   send: (action: unknown) => void
   onRematch: () => void
+  /** True while an action of ours is in flight — disable buttons to avoid double-sends. */
+  sending: boolean
 }
 
-function War({ view, send }: MpBoardProps) {
+function War({ view, send, sending }: MpBoardProps) {
   const state = view.state as WarState
   const seat = (view.youSeat ?? 0) as 0 | 1
   const spectator = view.youSeat === null
   const mine = seat === 0 ? 'player' : 'dealer'
   const iWon = view.phase === 'done' && state.winner === mine
+  const myReady = seat === 0 ? state.readyPlayer : state.readyDealer
+  const theirReady = seat === 0 ? state.readyDealer : state.readyPlayer
 
   return (
     <div className="flex flex-col items-center gap-4">
       <WarBoard
         state={state}
         mySeat={seat}
-        onFlip={() => send({ type: 'FLIP' })}
-        flipDisabled={spectator}
+        onFlip={() => send({ type: 'FLIP', side: mine })}
+        flipDisabled={spectator || sending}
         waitingNote={spectator ? 'Spectating.' : undefined}
+        ready={{ mine: myReady, theirs: theirReady }}
       />
       {view.phase === 'done' && !spectator && iWon && (
         <ScoreSubmit game="war" score={state.battles} />

@@ -20,11 +20,18 @@ export interface WarState {
   battles: number
   phase: WarPhase
   winner: 'player' | 'dealer' | null
+  /**
+   * Multiplayer only: has this side clicked Battle for the pending flip yet?
+   * A flip only resolves once both are true (then both reset to false).
+   * Untouched — always false — when FLIP is sent without a `side` (solo play).
+   */
+  readyPlayer: boolean
+  readyDealer: boolean
 }
 
 export type WarAction =
   | { type: 'START'; playerPile: Card[]; dealerPile: Card[] }
-  | { type: 'FLIP' }
+  | { type: 'FLIP'; side?: 'player' | 'dealer' }
   | { type: 'RESET' }
 
 export function initWar(): WarState {
@@ -40,6 +47,8 @@ export function initWar(): WarState {
     battles: 0,
     phase: 'idle',
     winner: null,
+    readyPlayer: false,
+    readyDealer: false,
   }
 }
 
@@ -72,6 +81,91 @@ function award(state: WarState, winner: 'player' | 'dealer', faceUps: Card[]): W
   }
 }
 
+/** The actual battle — both piles flip and the outcome resolves. */
+function resolveFlip(state: WarState): WarState {
+  const battles = state.battles + 1
+
+  // A player who can't produce a face-up card loses; the other side sweeps
+  // the table.
+  const onTable = [
+    ...state.pot,
+    ...(state.playerCard ? [state.playerCard] : []),
+    ...(state.dealerCard ? [state.dealerCard] : []),
+  ]
+  if (state.playerPile.length === 0) {
+    return {
+      ...state,
+      dealerPile: [...state.dealerPile, ...onTable],
+      pot: [],
+      playerCard: null,
+      dealerCard: null,
+      phase: 'gameover',
+      winner: 'dealer',
+    }
+  }
+  if (state.dealerPile.length === 0) {
+    return {
+      ...state,
+      playerPile: [...state.playerPile, ...onTable],
+      pot: [],
+      playerCard: null,
+      dealerCard: null,
+      phase: 'gameover',
+      winner: 'player',
+    }
+  }
+
+  if (state.phase === 'ready') {
+    const [playerCard, ...playerRest] = state.playerPile
+    const [dealerCard, ...dealerRest] = state.dealerPile
+    const result = compareCards(playerCard, dealerCard)
+    const mid = {
+      ...state,
+      playerPile: playerRest,
+      dealerPile: dealerRest,
+      playerCard,
+      dealerCard,
+      buried: 0,
+      battles,
+    }
+    // The two tied cards stay face-up for display and fold into the pot on
+    // the next flip.
+    if (result === 'war') return { ...mid, phase: 'war' }
+    return award(mid, result, [playerCard, dealerCard])
+  }
+
+  // phase === 'war': fold the tied face-ups into the pot, then each side
+  // buries up to three face-down and turns one up.
+  const carried = [
+    ...state.pot,
+    ...(state.playerCard ? [state.playerCard] : []),
+    ...(state.dealerCard ? [state.dealerCard] : []),
+  ]
+  const pBury = warBuryCount(state.playerPile.length)
+  const dBury = warBuryCount(state.dealerPile.length)
+  const pBuried = state.playerPile.slice(0, pBury)
+  const dBuried = state.dealerPile.slice(0, dBury)
+  const pAfter = state.playerPile.slice(pBury)
+  const dAfter = state.dealerPile.slice(dBury)
+  const [playerCard, ...playerRest] = pAfter
+  const [dealerCard, ...dealerRest] = dAfter
+  const potAfterBury = [...carried, ...pBuried, ...dBuried]
+  const result = compareCards(playerCard, dealerCard)
+  const mid = {
+    ...state,
+    playerPile: playerRest,
+    dealerPile: dealerRest,
+    playerCard,
+    dealerCard,
+    pot: potAfterBury,
+    buried: pBury + dBury,
+    battles,
+  }
+  // Another tie: the new face-ups stay shown and fold in on the next flip.
+  if (result === 'war') return { ...mid, phase: 'war' }
+  return award(mid, result, [playerCard, dealerCard])
+}
+
 export function warReducer(state: WarState, action: WarAction): WarState {
   switch (action.type) {
     case 'START':
@@ -84,87 +178,17 @@ export function warReducer(state: WarState, action: WarAction): WarState {
 
     case 'FLIP': {
       if (state.phase !== 'ready' && state.phase !== 'war') return state
-      const battles = state.battles + 1
 
-      // A player who can't produce a face-up card loses; the other side sweeps
-      // the table.
-      const onTable = [
-        ...state.pot,
-        ...(state.playerCard ? [state.playerCard] : []),
-        ...(state.dealerCard ? [state.dealerCard] : []),
-      ]
-      if (state.playerPile.length === 0) {
-        return {
-          ...state,
-          dealerPile: [...state.dealerPile, ...onTable],
-          pot: [],
-          playerCard: null,
-          dealerCard: null,
-          phase: 'gameover',
-          winner: 'dealer',
-        }
-      }
-      if (state.dealerPile.length === 0) {
-        return {
-          ...state,
-          playerPile: [...state.playerPile, ...onTable],
-          pot: [],
-          playerCard: null,
-          dealerCard: null,
-          phase: 'gameover',
-          winner: 'player',
-        }
-      }
+      if (!action.side) return resolveFlip(state) // solo play — resolve immediately
 
-      if (state.phase === 'ready') {
-        const [playerCard, ...playerRest] = state.playerPile
-        const [dealerCard, ...dealerRest] = state.dealerPile
-        const result = compareCards(playerCard, dealerCard)
-        const mid = {
-          ...state,
-          playerPile: playerRest,
-          dealerPile: dealerRest,
-          playerCard,
-          dealerCard,
-          buried: 0,
-          battles,
-        }
-        // The two tied cards stay face-up for display and fold into the pot on
-        // the next flip.
-        if (result === 'war') return { ...mid, phase: 'war' }
-        return award(mid, result, [playerCard, dealerCard])
-      }
-
-      // phase === 'war': fold the tied face-ups into the pot, then each side
-      // buries up to three face-down and turns one up.
-      const carried = [
-        ...state.pot,
-        ...(state.playerCard ? [state.playerCard] : []),
-        ...(state.dealerCard ? [state.dealerCard] : []),
-      ]
-      const pBury = warBuryCount(state.playerPile.length)
-      const dBury = warBuryCount(state.dealerPile.length)
-      const pBuried = state.playerPile.slice(0, pBury)
-      const dBuried = state.dealerPile.slice(0, dBury)
-      const pAfter = state.playerPile.slice(pBury)
-      const dAfter = state.dealerPile.slice(dBury)
-      const [playerCard, ...playerRest] = pAfter
-      const [dealerCard, ...dealerRest] = dAfter
-      const potAfterBury = [...carried, ...pBuried, ...dBuried]
-      const result = compareCards(playerCard, dealerCard)
-      const mid = {
+      // Multiplayer: both sides must ready up before a flip actually happens.
+      const next = {
         ...state,
-        playerPile: playerRest,
-        dealerPile: dealerRest,
-        playerCard,
-        dealerCard,
-        pot: potAfterBury,
-        buried: pBury + dBury,
-        battles,
+        readyPlayer: state.readyPlayer || action.side === 'player',
+        readyDealer: state.readyDealer || action.side === 'dealer',
       }
-      // Another tie: the new face-ups stay shown and fold in on the next flip.
-      if (result === 'war') return { ...mid, phase: 'war' }
-      return award(mid, result, [playerCard, dealerCard])
+      if (!(next.readyPlayer && next.readyDealer)) return next
+      return resolveFlip({ ...next, readyPlayer: false, readyDealer: false })
     }
 
     case 'RESET':

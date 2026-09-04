@@ -35,13 +35,17 @@ export interface GameServer {
 
 /** Which reducer role a seat maps to in the player-vs-AI reducers. */
 const role = (seat: number): 'player' | 'ai' => (seat === 0 ? 'player' : 'ai')
+/** War's roles are named player/dealer rather than player/ai. */
+const warRole = (seat: number): 'player' | 'dealer' => (seat === 0 ? 'player' : 'dealer')
 
 const war: GameServer = {
   deal: (c) =>
     warReducer(initWar(), { type: 'START', playerPile: c.slice(0, 26), dealerPile: c.slice(26) }),
   reduce: warReducer,
-  authorize: (s, _seat, a) =>
-    a?.type === 'FLIP' && (s.phase === 'ready' || s.phase === 'war'),
+  authorize: (s, seat, a) =>
+    a?.type === 'FLIP' &&
+    (s.phase === 'ready' || s.phase === 'war') &&
+    a.side === warRole(seat),
   isOver: (s) => s.phase === 'gameover',
 }
 

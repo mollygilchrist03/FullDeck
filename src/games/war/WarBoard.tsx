@@ -30,9 +30,18 @@ interface WarBoardProps {
   flipDisabled?: boolean
   /** Text below the piles when nobody can flip (e.g. "waiting for host"). */
   waitingNote?: string
+  /** Multiplayer only: who's clicked Battle for the pending flip. */
+  ready?: { mine: boolean; theirs: boolean }
 }
 
-export function WarBoard({ state, mySeat, onFlip, flipDisabled = false, waitingNote }: WarBoardProps) {
+export function WarBoard({
+  state,
+  mySeat,
+  onFlip,
+  flipDisabled = false,
+  waitingNote,
+  ready,
+}: WarBoardProps) {
   const mineKey = mySeat === 0 ? 'player' : 'dealer'
   const myPile = mySeat === 0 ? state.playerPile : state.dealerPile
   const theirPile = mySeat === 0 ? state.dealerPile : state.playerPile
@@ -100,15 +109,22 @@ export function WarBoard({ state, mySeat, onFlip, flipDisabled = false, waitingN
       {!over &&
         (waitingNote ? (
           <p className="text-sm text-card/60">{waitingNote}</p>
+        ) : ready?.mine ? (
+          <p className="text-sm text-gold">Waiting for your opponent to battle…</p>
         ) : (
-          <Button
-            size="lg"
-            variant={atWar ? 'accent' : 'gold'}
-            onClick={onFlip}
-            disabled={flipDisabled}
-          >
-            {atWar ? 'Go to war' : 'Battle'}
-          </Button>
+          <div className="flex flex-col items-center gap-1">
+            <Button
+              size="lg"
+              variant={atWar ? 'accent' : 'gold'}
+              onClick={onFlip}
+              disabled={flipDisabled}
+            >
+              {atWar ? 'Go to war' : 'Battle'}
+            </Button>
+            {ready?.theirs && (
+              <p className="text-xs text-gold">Your opponent is ready — it's on you.</p>
+            )}
+          </div>
         ))}
     </div>
   )

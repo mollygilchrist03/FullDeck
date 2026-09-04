@@ -47,6 +47,32 @@ describe('warReducer', () => {
     expect(s.playerPile).toHaveLength(2)
   })
 
+  it('multiplayer: a flip only resolves once both sides are ready', () => {
+    const s = start(deck(['KING', '2']), deck(['3', '4']))
+    const afterOne = warReducer(s, { type: 'FLIP', side: 'player' })
+    // Nobody has actually flipped yet — just marked ready.
+    expect(afterOne.readyPlayer).toBe(true)
+    expect(afterOne.readyDealer).toBe(false)
+    expect(afterOne.playerPile).toHaveLength(2)
+    expect(afterOne.battles).toBe(0)
+
+    // Clicking again from the same side changes nothing.
+    expect(warReducer(afterOne, { type: 'FLIP', side: 'player' })).toEqual(afterOne)
+
+    const resolved = warReducer(afterOne, { type: 'FLIP', side: 'dealer' })
+    expect(resolved.battles).toBe(1)
+    expect(resolved.readyPlayer).toBe(false)
+    expect(resolved.readyDealer).toBe(false)
+  })
+
+  it('solo play (no side) resolves a flip immediately', () => {
+    const s = start(deck(['KING', '2']), deck(['3', '4']))
+    const resolved = warReducer(s, { type: 'FLIP' })
+    expect(resolved.battles).toBe(1)
+    expect(resolved.readyPlayer).toBe(false)
+    expect(resolved.readyDealer).toBe(false)
+  })
+
   it('awards a decisive flip to the higher card', () => {
     const s = warReducer(start(deck(['KING', '2']), deck(['3', '4'])), { type: 'FLIP' })
     expect(s.lastWinner).toBe('player')
