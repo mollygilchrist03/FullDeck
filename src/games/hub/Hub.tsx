@@ -12,12 +12,12 @@ function GameCard({ to, title, blurb, glyph }: GameCardProps) {
   return (
     <Link
       to={to}
-      className="group flex flex-col gap-3 rounded-2xl border border-gold/40 bg-felt p-6 shadow-xl shadow-black/30 transition-transform hover:-translate-y-1 hover:border-gold"
+      className="group flex h-full flex-col gap-3 rounded-2xl border border-gold/40 bg-felt p-6 shadow-xl shadow-black/30 transition-transform hover:-translate-y-1 hover:border-gold"
     >
       <span className="text-4xl text-gold transition-transform group-hover:scale-110">{glyph}</span>
       <h2 className="font-display text-2xl font-bold text-card">{title}</h2>
       <p className="text-sm text-card/75">{blurb}</p>
-      <span className="mt-2 text-sm font-semibold text-casino">Play →</span>
+      <span className="mt-auto pt-2 text-sm font-semibold text-casino">Play →</span>
     </Link>
   )
 }
@@ -34,7 +34,8 @@ export function Hub() {
         </p>
       </section>
 
-      <div className="mx-auto mt-10 grid max-w-3xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {/* 10 games — 1 or 2 columns only, so every row is always full */}
+      <div className="mx-auto mt-10 grid max-w-3xl gap-5 sm:grid-cols-2">
         <GameCard
           to="/blackjack"
           title="Blackjack"
@@ -88,6 +89,12 @@ export function Hub() {
           title="Trash"
           blurb="Race to fill a row of Ace-to-10. Queens are wild, Kings kill your turn. Win rounds to shrink your row."
           glyph="♠"
+        />
+        <GameCard
+          to="/old-maid"
+          title="Old Maid"
+          blurb="One Queen has no partner. Draw from the dealer, pair off, and don't be the one left holding her."
+          glyph="♥"
         />
       </div>
     </Layout>

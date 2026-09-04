@@ -13,6 +13,7 @@ export type GameKey =
   | 'slapjack'
   | 'go-fish'
   | 'trash'
+  | 'old-maid'
 
 export interface GameMeta {
   key: GameKey
@@ -129,6 +130,17 @@ export const GAMES: Record<GameKey, GameMeta> = {
     higherIsBetter: false,
     min: 1,
     max: 200,
+  },
+  'old-maid': {
+    key: 'old-maid',
+    title: 'Old Maid',
+    metricLabel: 'Fewest draws',
+    metricHint: 'Draws you took before the dealer was left with the Old Maid.',
+    unit: '',
+    unitPosition: 'none',
+    higherIsBetter: false,
+    min: 1,
+    max: 60,
   },
 }
 
