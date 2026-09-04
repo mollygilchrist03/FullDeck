@@ -57,6 +57,25 @@ async function checkRateLimit(ip: string): Promise<boolean> {
   return n >= RATE_MAX
 }
 
+/**
+ * Rejects a POST whose `Origin` header names a different host than the one
+ * that served the request — a quick filter against the simplest scripted
+ * abuse (a bare `curl`/`fetch` from somewhere else on the internet). Browsers
+ * don't send `Origin` on every request, so absence isn't itself suspicious —
+ * this only blocks a *mismatched* one, never a missing one.
+ */
+function originLooksForeign(req: VercelRequest): boolean {
+  const origin = req.headers.origin
+  if (typeof origin !== 'string') return false
+  const host = req.headers.host
+  if (typeof host !== 'string') return false
+  try {
+    return new URL(origin).host !== host
+  } catch {
+    return true // an unparsable Origin is not a same-site one either
+  }
+}
+
 function clientIp(req: VercelRequest): string {
   const fwd = req.headers['x-forwarded-for']
   if (typeof fwd === 'string') return fwd.split(',')[0]!.trim()
@@ -114,6 +133,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (originLooksForeign(req)) {
+        res.status(403).json({ error: 'Request rejected.' })
+        return
+      }
       if (await checkRateLimit(clientIp(req))) {
         res.status(429).json({ error: 'Slow down — too many submissions.' })
         return
