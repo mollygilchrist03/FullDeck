@@ -6,6 +6,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
+import { feedback } from '../../lib/feedback'
 import { removeOneQueen } from './oldMaidLogic'
 import { initOldMaid, oldMaidReducer } from './oldMaidReducer'
 
@@ -23,6 +24,7 @@ export function OldMaid() {
     setDealing(true)
     try {
       const cards = removeOneQueen(await drawCards(52))
+      feedback('deal')
       dispatch({ type: 'START', playerHand: cards.slice(0, 26), aiHand: cards.slice(26) })
     } catch {
       /* surfaced via deck.error */
@@ -41,10 +43,15 @@ export function OldMaid() {
   useEffect(() => {
     if (state.phase !== 'aiTurn') return
     const id = setTimeout(() => {
+      feedback('flip')
       dispatch({ type: 'DRAW', index: Math.floor(Math.random() * state.playerHand.length) })
     }, AI_STEP_MS)
     return () => clearTimeout(id)
   }, [state.phase, state.playerHand.length])
+
+  useEffect(() => {
+    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
+  }, [state.phase, state.winner])
 
   const over = state.phase === 'gameover'
   const myTurn = state.phase === 'playerTurn'
@@ -86,7 +93,10 @@ export function OldMaid() {
                   key={i}
                   type="button"
                   disabled={!myTurn}
-                  onClick={() => dispatch({ type: 'DRAW', index: i })}
+                  onClick={() => {
+                    feedback('flip')
+                    dispatch({ type: 'DRAW', index: i })
+                  }}
                   className={`-ml-5 w-10 transition-transform first:ml-0 ${
                     myTurn ? 'hover:-translate-y-2' : ''
                   }`}
