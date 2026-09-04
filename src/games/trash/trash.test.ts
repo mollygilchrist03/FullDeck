@@ -75,6 +75,28 @@ describe('trashReducer', () => {
     expect(s.matchWinner).toBe('player')
   })
 
+  it('a dead deck for both sides ends the round for the fuller layout', () => {
+    const open = { faceDown: card('2'), locked: null }
+    const done = { faceDown: card('2'), locked: card('ACE') }
+    let s: TrashState = {
+      ...initTrash(),
+      phase: 'playerTurn',
+      turn: 'player',
+      playerSlots: [open, open],
+      playerSize: 2,
+      aiSlots: [done, open], // AI has fewer open slots
+      aiSize: 2,
+      stock: [],
+      discard: [card('KING')],
+    }
+    s = trashReducer(s, { type: 'DRAW' }) // nothing to draw -> forced pass
+    expect(s.stalePasses).toBe(1)
+    expect(s.phase).toBe('aiTurn')
+    s = trashReducer(s, { type: 'AI_STEP' }) // second forced pass -> resolve
+    expect(s.phase).toBe('roundOver')
+    expect(s.roundWinner).toBe('ai')
+  })
+
   it('clearing a bigger layout ends the round and shrinks the winner', () => {
     // size 2: draw an ace (slot 1) then a 2 (slot 2). Face-down cards are the 2 and ace.
     let s = trashReducer(initTrash(), {

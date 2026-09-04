@@ -28,6 +28,8 @@ export interface TrashState {
   /** Cumulative player turns — the score for a match win. */
   playerTurns: number
   aiSteps: number
+  /** Consecutive turns that passed with no card drawn (dead deck). */
+  stalePasses: number
   phase: TrashPhase
   log: string[]
 }
@@ -59,6 +61,7 @@ export function initTrash(): TrashState {
     matchWinner: null,
     playerTurns: 0,
     aiSteps: 0,
+    stalePasses: 0,
     phase: 'playerTurn',
     log: [],
   }
@@ -114,17 +117,33 @@ function lock(state: TrashState, side: 'player' | 'ai', idx: number): TrashState
     playerSlots: side === 'player' ? slots : state.playerSlots,
     aiSlots: side === 'ai' ? slots : state.aiSlots,
     held: swappedUp,
+    stalePasses: 0,
     log: push(state.log, `${label(side)} filled slot ${idx + 1}.`),
   }
 }
 
-function endTurn(state: TrashState, message: string): TrashState {
+const openCount = (slots: Slot[]) => slots.filter((s) => s.locked === null).length
+
+/** Both sides passed with a dead deck — fewest open slots wins the round. */
+function deadDeck(state: TrashState): TrashState {
+  const side: 'player' | 'ai' =
+    openCount(state.playerSlots) <= openCount(state.aiSlots) ? 'player' : 'ai'
+  return roundWin(
+    { ...state, turn: side, log: push(state.log, 'The deck is exhausted for both sides.') },
+    side,
+  )
+}
+
+function endTurn(state: TrashState, message: string, forced = false): TrashState {
+  const stalePasses = forced ? state.stalePasses + 1 : 0
+  if (forced && stalePasses >= 2) return deadDeck(state)
   const discard = state.held ? [...state.discard, state.held] : state.discard
   const nextTurn = state.turn === 'player' ? 'ai' : 'player'
   return {
     ...state,
     held: null,
     discard,
+    stalePasses,
     turn: nextTurn,
     phase: nextTurn === 'player' ? 'playerTurn' : 'aiTurn',
     playerTurns: state.turn === 'player' ? state.playerTurns + 1 : state.playerTurns,
@@ -163,7 +182,7 @@ function drawInto(state: TrashState, source: 'stock' | 'discard'): TrashState {
   }
   if (state.stock.length === 0) {
     // Recycle the discard (minus its top) into the stock.
-    if (state.discard.length <= 1) return endTurn(state, 'Deck exhausted — turn passes.')
+    if (state.discard.length <= 1) return endTurn(state, 'Deck exhausted — turn passes.', true)
     const top = state.discard[state.discard.length - 1]
     return drawInto(
       { ...state, stock: shuffle(state.discard.slice(0, -1)), discard: [top] },
