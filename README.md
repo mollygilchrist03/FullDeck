@@ -81,6 +81,17 @@ spacing, and confusable-unicode aware, with a false-positive whitelist).
 Client-side pre-check, server-side authority; the app still runs with no database
 attached (the API answers 503 and the UI says so).
 
+**Multiplayer.** "👥 Friend" in the nav → host a room (a 6-character code from an
+unambiguous alphabet) or join one; two players, same link. The authoritative
+game state is a `rooms` row; the *same reducers* run inside the serverless
+function, which validates that the acting seat owns the move before applying it.
+Clients stay live by long-polling — a `GET` that hangs server-side up to ~24s and
+returns the instant the room's `version` bumps. War, Slapjack, Old Maid, Crazy
+Eights, Go Fish, and Trash are all playable in a room (High-Low and Video Poker
+stay solo). Solo-vs-AI is untouched — the reducers were generalised so each move
+carries an optional `side`, the AI move-picker just dispatches side `'ai'`, and a
+human in that seat sends the same actions.
+
 ## Notable engineering decisions
 
 The parts worth reading are the pure functions — each is isolated, unit-tested,
@@ -207,7 +218,7 @@ and free of any React or network concerns.
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest (pure-logic unit tests) |
 | Card data | Deck of Cards API (free, no key) |
-| Leaderboard | Vercel serverless function (`api/`) + Neon Postgres via Drizzle ORM; `obscenity` name filter |
+| Leaderboard + rooms | Vercel serverless functions (`api/`) + Neon Postgres via Drizzle ORM; `obscenity` name filter; long-poll sync |
 | Hosting | Vercel (static SPA + functions) |
 
 ## Local setup
@@ -232,11 +243,11 @@ serverless functions; [`vercel.json`](vercel.json) rewrites every non-`/api`
 path to `index.html` so the client router handles the routes on a hard refresh.
 The repo is connected to Vercel, so a push to `master` is a production deploy.
 
-**Leaderboard database.** The live demo is wired to a Neon Postgres store
-(created from the Vercel project's **Storage** tab, which sets `DATABASE_URL`);
-`npm run db:push` created the `scores` table. To run your own, do the same and
-set `DATABASE_URL` for all environments. Until that's done the site still
-deploys and runs — the leaderboard just reports that it isn't configured.
+**Database.** The live demo is wired to a Neon Postgres store (created from the
+Vercel project's **Storage** tab, which sets `DATABASE_URL`); `npm run db:push`
+created the `scores` and `rooms` tables. To run your own, do the same and set
+`DATABASE_URL` for all environments. Until that's done the site still deploys and
+runs — the leaderboard and multiplayer just report that they aren't configured.
 
 ## What's next
 
