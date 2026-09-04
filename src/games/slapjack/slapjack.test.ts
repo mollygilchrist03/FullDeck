@@ -48,6 +48,15 @@ describe('slapjackReducer', () => {
     expect(s.aiPile).toHaveLength(3)
   })
 
+  it('resolves by slap count when the last card is flipped and nobody can slap', () => {
+    // Player flips their only card (a 2, not a Jack); the AI is already empty.
+    let s = start(deck(['2']), [])
+    s = { ...s, slaps: { player: 2, ai: 1 } }
+    s = slapjackReducer(s, { type: 'FLIP' })
+    expect(s.phase).toBe('gameover')
+    expect(s.winner).toBe('player') // more slaps
+  })
+
   it('ends the game when one side holds every card', () => {
     let s = start(deck(['JACK']), deck(['5']))
     s = slapjackReducer(s, { type: 'FLIP' }) // player flips the Jack

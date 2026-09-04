@@ -54,6 +54,24 @@ function checkWin(s: SlapjackState): SlapjackState {
   return s
 }
 
+/**
+ * Neither side has a card left to flip (every card sits in the centre with no
+ * Jack to slap for). Decide it by who has landed more slaps; the player takes a
+ * tie.
+ */
+function resolveBySlaps(s: SlapjackState): SlapjackState {
+  const winner = s.slaps.player >= s.slaps.ai ? 'player' : 'ai'
+  return {
+    ...s,
+    phase: 'gameover',
+    winner,
+    log: push(
+      s.log,
+      `No cards left to flip — most slaps takes it. ${winner === 'player' ? 'You win!' : 'You lose.'}`,
+    ),
+  }
+}
+
 export function slapjackReducer(state: SlapjackState, action: SlapjackAction): SlapjackState {
   switch (action.type) {
     case 'START':
@@ -66,12 +84,13 @@ export function slapjackReducer(state: SlapjackState, action: SlapjackAction): S
 
     case 'FLIP': {
       if (state.phase !== 'flipping') return state
+      // Nobody can flip — the whole deck is stuck in the centre with no Jack up.
+      if (state.playerPile.length === 0 && state.aiPile.length === 0) return resolveBySlaps(state)
       // The player whose turn it is flips; if they're empty, the other flips.
       let turn = state.turn
       if (turn === 'player' && state.playerPile.length === 0) turn = 'ai'
       if (turn === 'ai' && state.aiPile.length === 0) turn = 'player'
       const pile = turn === 'player' ? state.playerPile : state.aiPile
-      if (pile.length === 0) return state
       const [card, ...rest] = pile
       const next: SlapjackState = {
         ...state,
@@ -80,6 +99,10 @@ export function slapjackReducer(state: SlapjackState, action: SlapjackAction): S
         center: [...state.center, card],
         turn: turn === 'player' ? 'ai' : 'player',
         phase: isJack(card) ? 'slap' : 'flipping',
+      }
+      // That was the last card and it isn't a Jack — no way to continue.
+      if (next.playerPile.length === 0 && next.aiPile.length === 0 && next.phase === 'flipping') {
+        return resolveBySlaps(next)
       }
       return next
     }
