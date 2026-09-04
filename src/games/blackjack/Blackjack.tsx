@@ -5,6 +5,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
+import { feedback } from '../../lib/feedback'
 import type { Card as CardData } from '../../types/card'
 import {
   blackjackReducer,
@@ -34,6 +35,12 @@ export function Blackjack() {
     setPeakBank((p) => Math.max(p, state.bank))
   }, [state.bank])
 
+  useEffect(() => {
+    if (state.phase !== 'settled') return
+    if (state.netPayout > 0) feedback('win')
+    else if (state.netPayout < 0) feedback('lose')
+  }, [state.phase, state.netPayout])
+
   const { startNewDeck, drawCards } = deck
 
   useEffect(() => {
@@ -57,24 +64,28 @@ export function Blackjack() {
   const handleDeal = () =>
     act(async () => {
       const c = await drawCards(4)
+      feedback('deal')
       dispatch({ type: 'DEAL', playerCards: [c[0], c[2]], dealerCards: [c[1], c[3]] })
     })
 
   const handleHit = () =>
     act(async () => {
       const [card] = await drawCards(1)
+      feedback('flip')
       dispatch({ type: 'HIT', card })
     })
 
   const handleDouble = () =>
     act(async () => {
       const [card] = await drawCards(1)
+      feedback('flip')
       dispatch({ type: 'DOUBLE', card })
     })
 
   const handleSplit = () =>
     act(async () => {
       const [cardA, cardB] = await drawCards(2)
+      feedback('flip')
       dispatch({ type: 'SPLIT', cardA, cardB })
     })
 
@@ -93,6 +104,7 @@ export function Blackjack() {
         if (cancelled) return
         const [card] = await drawCards(1)
         if (cancelled) return
+        feedback('flip')
         dealer = [...dealer, card]
         setLiveDealer(dealer)
       }
