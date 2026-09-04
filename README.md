@@ -5,15 +5,17 @@
 A small collection of classic card games built from scratch — the point isn't
 displaying card data, it's implementing the actual games: shuffling, dealing,
 hand scoring, dealer AI, win conditions, and the discrete state transitions each
-game runs on. Nine games — Blackjack, Memory Match, War, High-Low, Video Poker,
-Crazy Eights, Slapjack, Go Fish, and Trash — share one foundation, and the
-interesting logic is factored into isolated pure functions with their own unit
-tests rather than tangled into components. Rules follow the Bicycle / Wikipedia
-references, and each game screen carries a matching "How to play" panel.
+game runs on. Ten games — Blackjack, Memory Match, War, High-Low, Video Poker,
+Crazy Eights, Slapjack, Go Fish, Trash, and Old Maid — share one foundation, and
+the interesting logic is factored into isolated pure functions with their own
+unit tests rather than tangled into components. Rules follow the Bicycle /
+Wikipedia references, and each game screen carries a matching "How to play"
+panel. Six of the ten are playable head-to-head with a friend over a
+join-code room, not just against the built-in AI.
 
 **Live demo:** [full-deck-five.vercel.app](https://full-deck-five.vercel.app)
 
-![Game hub — the nine games on the felt table](docs/screenshots/hub.png)
+![Game hub — the ten games on the felt table](docs/screenshots/hub.png)
 
 ![Blackjack — a hand in progress with the dealer's hole card face-down and the chip stack](docs/screenshots/blackjack.png)
 
@@ -65,6 +67,12 @@ sets of four; most books when all 13 are made wins.
 card into its position, swap up whatever was there and keep going. Queens are
 wild, Jacks and Kings end the turn. Clear the row to win the round; the winner
 lays one fewer card next round — win a round at one card to take the match.
+
+**Old Maid.** One Queen is pulled from the deck before dealing, so its partner
+is left stranded — that's the Old Maid. Every hand is dealt out and every pair
+laid down at once; on your turn you draw one unseen card from the dealer's
+hand, and if it pairs with something in yours the pair goes down. Whoever's
+left holding the lone Queen loses.
 
 Every game draws a real, server-shuffled deck from the free, keyless
 [Deck of Cards API](https://deckofcardsapi.com/) rather than simulating a deck
@@ -203,7 +211,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **166 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
+- **180 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
   outcome settlement, board building, card comparison, high-low judging, poker
   evaluation, payouts, blackjack split/double/insurance, war conservation, every
   AI policy, the profanity filter, leaderboard validation/formatting, and every
@@ -216,7 +224,7 @@ and free of any React or network concerns.
 | Framework | React 19 + TypeScript (strict) |
 | Build | Vite |
 | Styling | Tailwind CSS v4 (palette defined in `@theme`) |
-| Routing | React Router — `/`, nine game routes, `/leaderboard` |
+| Routing | React Router — `/`, ten game routes (code-split with `React.lazy`), `/leaderboard`, `/multiplayer`, `/room/:code` |
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest (pure-logic unit tests) |
 | Card data | Deck of Cards API (free, no key) |
