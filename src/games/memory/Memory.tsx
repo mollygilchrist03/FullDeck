@@ -16,6 +16,7 @@ import { DifficultySelector } from './components/DifficultySelector'
 import { CompletionScreen } from './components/CompletionScreen'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
+import { feedback } from '../../lib/feedback'
 
 const MISMATCH_DELAY = 900
 const PULSE_DELAY = 600
@@ -35,6 +36,7 @@ export function Memory() {
       setDealing(true)
       try {
         const cards = await reshuffleAndDraw(PAIRS_FOR[size])
+        feedback('deal')
         dispatch({ type: 'START', tiles: buildBoard(cards, PAIRS_FOR[size]) })
         startAtRef.current = performance.now()
         setElapsedMs(0)
@@ -67,6 +69,12 @@ export function Memory() {
     const t = setTimeout(() => dispatch({ type: 'CLEAR_PULSE' }), PULSE_DELAY)
     return () => clearTimeout(t)
   }, [state.justMatched])
+
+  // Fires once on the transition into a win — [state.status] only changes
+  // value when the game actually moves phase, so this can't double-fire.
+  useEffect(() => {
+    if (state.status === 'won') feedback('win')
+  }, [state.status])
 
   // Running timer while playing.
   useEffect(() => {
@@ -160,7 +168,10 @@ export function Memory() {
             matched={state.matched}
             justMatched={state.justMatched}
             lock={state.lock}
-            onFlip={(id) => dispatch({ type: 'FLIP', id })}
+            onFlip={(id) => {
+              feedback('flip')
+              dispatch({ type: 'FLIP', id })
+            }}
           />
         )}
       </div>
