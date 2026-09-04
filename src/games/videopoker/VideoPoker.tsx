@@ -6,6 +6,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
+import { feedback } from '../../lib/feedback'
 import { CATEGORY_LABEL } from './pokerHand'
 import { MAX_BET, PAY_PER_CREDIT } from './paytable'
 import {
@@ -49,7 +50,9 @@ export function VideoPoker() {
   const didInit = useRef(false)
 
   useEffect(() => {
-    if (state.result) setBestWin((b) => Math.max(b, state.result!.payout))
+    if (!state.result) return
+    setBestWin((b) => Math.max(b, state.result!.payout))
+    feedback(state.result.payout > 0 ? 'win' : 'lose')
   }, [state.result])
 
   const { startNewDeck, drawCards } = deck
@@ -64,6 +67,7 @@ export function VideoPoker() {
     setBusy(true)
     try {
       const cards = await drawCards(5)
+      feedback('deal')
       dispatch({ type: 'DEAL', cards })
     } catch {
       /* surfaced via deck.error */
@@ -77,6 +81,7 @@ export function VideoPoker() {
     try {
       const need = drawSlots(state.held).length
       const replacements = need > 0 ? await drawCards(need) : []
+      feedback('flip')
       dispatch({ type: 'DRAW', replacements })
     } catch {
       /* surfaced via deck.error */
