@@ -70,6 +70,8 @@ export function useRoom(code: string): UseRoom {
     const poll = async () => {
       while (alive) {
         try {
+          // Re-read each loop so a join elsewhere in this tab is picked up.
+          seatIdRef.current = loadSeatId(code)
           const seat = seatIdRef.current
           const params = new URLSearchParams()
           if (seat) params.set('seatId', seat)

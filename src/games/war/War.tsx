@@ -1,32 +1,12 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Layout } from '../../components/Layout'
 import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
 import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { initWar, warReducer } from './warReducer'
-
-function Pile({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative h-24 w-16 sm:h-28 sm:w-20">
-        {count > 0 ? (
-          <>
-            {count > 2 && <Card faceDown className="absolute left-1 top-1 opacity-60" />}
-            {count > 1 && <Card faceDown className="absolute left-0.5 top-0.5 opacity-80" />}
-            <Card faceDown className="absolute inset-0" />
-          </>
-        ) : (
-          <div className="h-full w-full rounded-[0.55rem] border border-dashed border-card/30" />
-        )}
-      </div>
-      <p className="text-xs uppercase tracking-widest text-gold/80">{label}</p>
-      <p className="text-lg font-bold tabular-nums text-card">{count}</p>
-    </div>
-  )
-}
+import { WarBoard } from './WarBoard'
 
 export function War() {
   const deck = useDeck()
@@ -54,20 +34,7 @@ export function War() {
     void newGame()
   }, [newGame])
 
-  const atWar = state.phase === 'war'
   const over = state.phase === 'gameover'
-  const potOnTable = state.pot.length + (state.playerCard ? 1 : 0) + (state.dealerCard ? 1 : 0)
-  const banner = over
-    ? state.winner === 'player'
-      ? 'You take the whole deck — you win!'
-      : 'The dealer has every card. You lose.'
-    : atWar
-      ? state.buried > 0
-        ? `War! ${state.buried} cards face down, ${potOnTable} on the line — flip again.`
-        : `Tie — this means war. Flip again: three cards down, one up.`
-      : state.lastWinner
-        ? `${state.lastWinner === 'player' ? 'You' : 'Dealer'} won ${state.lastPotSize} card${state.lastPotSize === 1 ? '' : 's'}.`
-        : 'Flip a card. Higher rank wins the pair; a tie means war.'
 
   return (
     <Layout
@@ -95,57 +62,15 @@ export function War() {
       {dealing ? (
         <Loading label="Splitting the deck…" />
       ) : (
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex w-full max-w-md items-start justify-between">
-            <Pile label="Dealer" count={state.dealerPile.length} />
-            <div className="pt-8 text-center">
-              <p className="text-xs uppercase tracking-widest text-gold/80">Battles</p>
-              <p className="text-lg font-bold tabular-nums text-card">{state.battles}</p>
-            </div>
-            <Pile label="You" count={state.playerPile.length} />
-          </div>
-
-          <div className="flex min-h-[9rem] items-center justify-center gap-6">
-            <div className="w-20 sm:w-24">
-              {state.dealerCard ? (
-                <Card card={state.dealerCard} faceDown={false} dealt />
-              ) : (
-                <div className="aspect-[5/7] w-full rounded-[0.55rem] border border-dashed border-card/25" />
-              )}
-            </div>
-            <span className="font-display text-xl text-gold">vs</span>
-            <div className="w-20 sm:w-24">
-              {state.playerCard ? (
-                <Card card={state.playerCard} faceDown={false} dealt />
-              ) : (
-                <div className="aspect-[5/7] w-full rounded-[0.55rem] border border-dashed border-card/25" />
-              )}
-            </div>
-          </div>
-
-          <p
-            className={`min-h-6 text-center font-semibold ${
-              over ? 'font-display text-xl text-gold' : atWar ? 'text-casino' : 'text-card/80'
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            {banner}
-          </p>
-
-          {over ? (
+        <div className="flex flex-col items-center gap-4">
+          <WarBoard state={state} mySeat={0} onFlip={() => dispatch({ type: 'FLIP' })} />
+          {over && (
             <div className="flex flex-col items-center gap-3">
-              {state.winner === 'player' && (
-                <ScoreSubmit game="war" score={state.battles} />
-              )}
+              {state.winner === 'player' && <ScoreSubmit game="war" score={state.battles} />}
               <Button size="lg" variant="gold" onClick={() => void newGame()}>
                 Play again
               </Button>
             </div>
-          ) : (
-            <Button size="lg" variant={atWar ? 'accent' : 'gold'} onClick={() => dispatch({ type: 'FLIP' })}>
-              {atWar ? 'Go to war' : 'Battle'}
-            </Button>
           )}
         </div>
       )}

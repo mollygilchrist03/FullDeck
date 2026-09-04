@@ -11,12 +11,16 @@ import { GoFish } from './games/gofish/GoFish'
 import { Trash } from './games/trash/Trash'
 import { OldMaid } from './games/oldmaid/OldMaid'
 import { Leaderboard } from './games/leaderboard/Leaderboard'
+import { Multiplayer } from './games/multiplayer/Multiplayer'
+import { Room } from './games/multiplayer/Room'
 
 export function App() {
   return (
     <Routes>
       <Route path="/" element={<Hub />} />
       <Route path="/leaderboard" element={<Leaderboard />} />
+      <Route path="/multiplayer" element={<Multiplayer />} />
+      <Route path="/room/:code" element={<Room />} />
       <Route path="/blackjack" element={<Blackjack />} />
       <Route path="/memory" element={<Memory />} />
       <Route path="/war" element={<War />} />

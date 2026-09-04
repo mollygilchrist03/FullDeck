@@ -97,6 +97,15 @@ export function Hub() {
           glyph="♥"
         />
       </div>
+
+      <div className="mx-auto mt-8 text-center">
+        <Link
+          to="/multiplayer"
+          className="inline-flex items-center gap-2 rounded-full border border-gold/50 bg-black/20 px-5 py-2.5 text-sm font-semibold text-gold hover:border-gold hover:bg-white/5"
+        >
+          👥 Play with a friend
+        </Link>
+      </div>
     </Layout>
   )
 }
