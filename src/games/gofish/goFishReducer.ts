@@ -1,7 +1,7 @@
 import type { Card, Rank } from '../../types/card'
 import { chooseAiAsk, countRank, takeBooks } from './goFishLogic'
 
-export type GoFishPhase = 'playerAsk' | 'aiTurn' | 'gameover'
+export type GoFishPhase = 'playerAsk' | 'playerDraw' | 'aiTurn' | 'gameover'
 
 export interface GoFishState {
   playerHand: Card[]
@@ -10,6 +10,11 @@ export interface GoFishState {
   playerBooks: Rank[]
   aiBooks: Rank[]
   phase: GoFishPhase
+  /**
+   * During 'playerDraw': the rank the player asked for. If the card they fish up
+   * matches, their turn continues. Null for an empty-hand "draw up".
+   */
+  pendingRank: Rank | null
   /** Ranks the player has asked for — the AI's memory. */
   knownPlayerRanks: Rank[]
   /** Increments each AI_STEP so the container can keep stepping. */
@@ -22,6 +27,7 @@ export interface GoFishState {
 export type GoFishAction =
   | { type: 'START'; playerHand: Card[]; aiHand: Card[]; stock: Card[] }
   | { type: 'ASK'; rank: Rank }
+  | { type: 'DRAW' }
   | { type: 'AI_STEP' }
   | { type: 'RESET' }
 
@@ -51,6 +57,7 @@ export function initGoFish(): GoFishState {
     playerBooks: [],
     aiBooks: [],
     phase: 'playerAsk',
+    pendingRank: null,
     knownPlayerRanks: [],
     aiSteps: 0,
     turnsTaken: 0,
@@ -93,19 +100,18 @@ function bookAndCheck(state: GoFishState): GoFishState {
 }
 
 /**
- * Hand the turn to the player. If their hand is empty but the stock isn't, they
- * draw up first (Bicycle: you draw from the stock on your turn if you have no
- * cards). If nothing can be drawn, the turn bounces back to the AI.
+ * Hand the turn to the player. With cards in hand they ask; with an empty hand
+ * and a live stock they must click to draw up (Bicycle rule); with nothing to
+ * draw the turn bounces back to the AI.
  */
 function toPlayerTurn(state: GoFishState): GoFishState {
-  let s = state
-  while (s.phase !== 'gameover' && s.playerHand.length === 0 && s.stock.length > 0) {
-    const d = drawFor(s, 'player')
-    s = bookAndCheck({ ...d.state, log: push(d.state.log, 'Your hand was empty — you draw from the stock.') })
+  if (state.phase === 'gameover') return state
+  if (state.playerHand.length === 0) {
+    return state.stock.length > 0
+      ? { ...state, phase: 'playerDraw', pendingRank: null }
+      : { ...state, phase: 'aiTurn' }
   }
-  if (s.phase === 'gameover') return s
-  if (s.playerHand.length === 0) return { ...s, phase: 'aiTurn' }
-  return { ...s, phase: 'playerAsk' }
+  return { ...state, phase: 'playerAsk', pendingRank: null }
 }
 
 /** Draw one card into the given side's hand if the stock has any. */
@@ -158,20 +164,42 @@ export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishS
         return s
       }
 
-      // Go fish.
-      const { state: drawnState, drawn } = drawFor(
-        { ...state, knownPlayerRanks: known, turnsTaken, log: push(state.log, 'Go fish!') },
-        'player',
-      )
-      const gotWhatWeAsked = drawn?.rank === action.rank
+      // Go fish — the player has to click the stock to draw.
+      return {
+        ...state,
+        knownPlayerRanks: known,
+        turnsTaken,
+        phase: 'playerDraw',
+        pendingRank: action.rank,
+        log: push(state.log, `No ${RANK_LABEL[action.rank]} — go fish. Draw a card.`),
+      }
+    }
+
+    case 'DRAW': {
+      if (state.phase !== 'playerDraw') return state
+      if (state.stock.length === 0) {
+        return { ...state, phase: 'aiTurn', pendingRank: null, log: push(state.log, 'Nothing left to fish.') }
+      }
+      const { state: drawnState, drawn } = drawFor(state, 'player')
+      const matched = state.pendingRank != null && drawn?.rank === state.pendingRank
       const s = bookAndCheck({
         ...drawnState,
-        log: gotWhatWeAsked
-          ? push(drawnState.log, `You fished a ${RANK_LABEL[action.rank].replace(/s$/, '')} — go again.`)
-          : drawnState.log,
+        log: push(
+          drawnState.log,
+          matched
+            ? `You fished the ${RANK_LABEL[state.pendingRank!].replace(/s$/, '')} you asked for — go again!`
+            : `You fished a ${RANK_LABEL[drawn!.rank].replace(/s$/, '')}.`,
+        ),
       })
       if (s.phase === 'gameover') return s
-      return gotWhatWeAsked ? toPlayerTurn(s) : { ...s, phase: 'aiTurn' }
+      if (state.pendingRank != null) {
+        return matched
+          ? { ...s, phase: 'playerAsk', pendingRank: null }
+          : { ...s, phase: 'aiTurn', pendingRank: null }
+      }
+      // Draw-up: keep drawing until the player has a card or the stock runs out.
+      if (s.playerHand.length > 0) return { ...s, phase: 'playerAsk' }
+      return s.stock.length > 0 ? { ...s, phase: 'playerDraw' } : { ...s, phase: 'aiTurn' }
     }
 
     case 'AI_STEP': {

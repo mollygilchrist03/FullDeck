@@ -126,6 +126,20 @@ export function GoFish() {
             <Books label="Your books" books={state.playerBooks} />
           </div>
 
+          {/* The stock — click it to fish when you've missed. */}
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'DRAW' })}
+            disabled={state.phase !== 'playerDraw'}
+            className="flex flex-col items-center gap-1 disabled:opacity-60"
+            aria-label="Draw from the stock"
+          >
+            <div className={`w-16 ${state.phase === 'playerDraw' ? 'animate-pulse-match' : ''}`}>
+              <Card faceDown />
+            </div>
+            <span className="text-xs text-card/70">stock {state.stock.length}</span>
+          </button>
+
           <p className="min-h-5 max-w-md text-center text-sm text-card/75" role="status" aria-live="polite">
             {state.log[state.log.length - 1]}
           </p>
@@ -142,20 +156,30 @@ export function GoFish() {
           {!over ? (
             <div className="flex flex-col items-center gap-2">
               <p className="text-sm text-card/70">
-                {state.phase === 'playerAsk' ? 'Ask the dealer for:' : 'Dealer is thinking…'}
+                {state.phase === 'playerAsk'
+                  ? 'Ask the dealer for:'
+                  : state.phase === 'playerDraw'
+                    ? 'Go fish — tap the stock to draw.'
+                    : 'Dealer is thinking…'}
               </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {myRanks.map((r) => (
-                  <Button
-                    key={r}
-                    variant="gold"
-                    onClick={() => dispatch({ type: 'ASK', rank: r })}
-                    disabled={state.phase !== 'playerAsk'}
-                  >
-                    {RANK_SHORT[r]}
-                  </Button>
-                ))}
-              </div>
+              {state.phase === 'playerDraw' ? (
+                <Button size="lg" variant="accent" onClick={() => dispatch({ type: 'DRAW' })}>
+                  🎣 Go fish
+                </Button>
+              ) : (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {myRanks.map((r) => (
+                    <Button
+                      key={r}
+                      variant="gold"
+                      onClick={() => dispatch({ type: 'ASK', rank: r })}
+                      disabled={state.phase !== 'playerAsk'}
+                    >
+                      {RANK_SHORT[r]}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3">

@@ -55,17 +55,20 @@ describe('goFishReducer', () => {
     expect(s.phase).toBe('playerAsk')
   })
 
-  it('a miss makes you go fish and passes the turn', () => {
-    const s = goFishReducer(seed(), { type: 'ASK', rank: '5' }) // AI has no 5s
+  it('a miss sends you to a draw you have to click, then passes the turn', () => {
+    let s = goFishReducer(seed(), { type: 'ASK', rank: '5' }) // AI has no 5s
+    expect(s.phase).toBe('playerDraw')
+    expect(s.pendingRank).toBe('5')
+    expect(s.playerHand).toHaveLength(3) // not drawn yet
+    s = goFishReducer(s, { type: 'DRAW' })
     expect(s.playerHand).toHaveLength(4) // drew the KING
-    expect(s.stock).toHaveLength(2)
     expect(s.phase).toBe('aiTurn')
   })
 
   it('fishing exactly what you asked for lets you go again', () => {
-    // player asks for 9; AI has none; top of stock is KING then 9 -> not a match, passes.
-    // Re-seed so the top of stock IS a 9.
-    const s = goFishReducer(seed({ stock: hand('9', 'KING') }), { type: 'ASK', rank: '9' })
+    let s = goFishReducer(seed({ stock: hand('9', 'KING') }), { type: 'ASK', rank: '9' })
+    expect(s.phase).toBe('playerDraw')
+    s = goFishReducer(s, { type: 'DRAW' }) // top of stock is a 9
     expect(s.phase).toBe('playerAsk')
     expect(s.playerHand.filter((c) => c.rank === '9')).toHaveLength(2)
   })
@@ -88,7 +91,10 @@ describe('goFishReducer', () => {
     })
     s = goFishReducer(s, { type: 'AI_STEP' }) // takes the player's 3, stays aiTurn
     expect(s.playerHand).toHaveLength(0)
-    s = goFishReducer(s, { type: 'AI_STEP' }) // AI asks again, misses, go fish, hand back
+    s = goFishReducer(s, { type: 'AI_STEP' }) // AI asks again, misses, turn back to empty player
+    expect(s.phase).toBe('playerDraw') // must click to draw up
+    expect(s.pendingRank).toBeNull()
+    s = goFishReducer(s, { type: 'DRAW' })
     expect(s.phase).toBe('playerAsk')
     expect(s.playerHand.length).toBeGreaterThan(0)
   })
