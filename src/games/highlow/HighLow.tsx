@@ -6,6 +6,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
+import { feedback } from '../../lib/feedback'
 import { highLowReducer, initHighLow } from './highLowReducer'
 
 const JUDGEMENT_TEXT = {
@@ -27,6 +28,7 @@ export function HighLow() {
     setBusy(true)
     try {
       const [first] = await drawCards(1)
+      feedback('deal')
       dispatch({ type: 'START', first })
     } catch {
       /* surfaced via deck.error */
@@ -45,11 +47,17 @@ export function HighLow() {
     setBest((b) => Math.max(b, state.streak))
   }, [state.streak])
 
+  useEffect(() => {
+    if (state.phase === 'won') feedback('win')
+    else if (state.phase === 'gameover') feedback('lose')
+  }, [state.phase])
+
   const guess = useCallback(
     async (dir: 'higher' | 'lower') => {
       setBusy(true)
       try {
         const [next] = await drawCards(1)
+        feedback('flip')
         dispatch({ type: 'GUESS', guess: dir, next })
       } catch {
         /* surfaced via deck.error */
