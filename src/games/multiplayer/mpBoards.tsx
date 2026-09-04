@@ -3,6 +3,8 @@ import { ScoreSubmit } from '../../components/ScoreSubmit'
 import type { MpGameKey, RoomView } from '../../lib/multiplayer'
 import { WarBoard } from '../war/WarBoard'
 import type { WarState } from '../war/warReducer'
+import { SlapjackRoom } from './SlapjackRoom'
+import { OldMaidRoom } from './OldMaidRoom'
 
 export interface MpBoardProps {
   view: RoomView
@@ -43,6 +45,8 @@ function NotReady({ view }: MpBoardProps) {
 
 const BOARDS: Partial<Record<MpGameKey, (p: MpBoardProps) => ReactNode>> = {
   war: War,
+  slapjack: SlapjackRoom,
+  'old-maid': OldMaidRoom,
 }
 
 export function MpBoard(props: MpBoardProps): ReactNode {
