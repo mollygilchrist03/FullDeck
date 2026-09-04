@@ -6,6 +6,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
+import { feedback } from '../../lib/feedback'
 import type { Suit } from '../../types/card'
 import { isPlayable, SUITS } from './crazyEightsLogic'
 import {
@@ -46,6 +47,7 @@ export function CrazyEights() {
       const starterIdx = rest.findIndex((c) => c.rank !== '8')
       const discard = [rest[starterIdx]]
       const stock = rest.filter((_, i) => i !== starterIdx)
+      feedback('deal')
       dispatch({
         type: 'START',
         stock,
@@ -70,9 +72,16 @@ export function CrazyEights() {
   // Drive the AI's turn one step at a time.
   useEffect(() => {
     if (state.phase !== 'aiTurn') return
-    const t = setTimeout(() => dispatch({ type: 'AI_STEP' }), AI_STEP_MS)
+    const t = setTimeout(() => {
+      feedback('flip')
+      dispatch({ type: 'AI_STEP' })
+    }, AI_STEP_MS)
     return () => clearTimeout(t)
   }, [state.phase, state.aiSteps])
+
+  useEffect(() => {
+    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
+  }, [state.phase, state.winner])
 
   const top = state.discard.length ? topCard(state) : null
   const myTurn = state.phase === 'playerTurn'
@@ -128,7 +137,10 @@ export function CrazyEights() {
           <div className="flex items-center gap-6">
             <button
               type="button"
-              onClick={() => dispatch({ type: 'DRAW' })}
+              onClick={() => {
+                feedback('flip')
+                dispatch({ type: 'DRAW' })
+              }}
               disabled={!mustDraw}
               className="flex flex-col items-center gap-1 disabled:opacity-60"
               aria-label="Draw a card"
@@ -165,7 +177,10 @@ export function CrazyEights() {
                   <button
                     key={s}
                     type="button"
-                    onClick={() => dispatch({ type: 'CHOOSE_SUIT', suit: s })}
+                    onClick={() => {
+                      feedback('flip')
+                      dispatch({ type: 'CHOOSE_SUIT', suit: s })
+                    }}
                     className={`h-12 w-12 rounded-lg border border-gold/50 bg-felt text-2xl ${
                       isRed(s) ? 'text-casino' : 'text-card'
                     } hover:border-gold`}
@@ -185,7 +200,14 @@ export function CrazyEights() {
                 <Card
                   card={c}
                   faceDown={false}
-                  onClick={myTurn && legal(i) ? () => dispatch({ type: 'PLAY', index: i }) : undefined}
+                  onClick={
+                    myTurn && legal(i)
+                      ? () => {
+                          feedback('flip')
+                          dispatch({ type: 'PLAY', index: i })
+                        }
+                      : undefined
+                  }
                   disabled={!myTurn || !legal(i)}
                   className={myTurn && legal(i) ? 'ring-2 ring-gold' : 'opacity-55'}
                 />
@@ -197,12 +219,22 @@ export function CrazyEights() {
           {myTurn && (
             <div className="flex flex-col items-center gap-2">
               <div className="flex gap-3">
-                <Button variant="ghost" onClick={() => dispatch({ type: 'DRAW' })} disabled={!mustDraw}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    feedback('flip')
+                    dispatch({ type: 'DRAW' })
+                  }}
+                  disabled={!mustDraw}
+                >
                   Draw
                 </Button>
                 <Button
                   variant="accent"
-                  onClick={() => dispatch({ type: 'PASS' })}
+                  onClick={() => {
+                    feedback('flip')
+                    dispatch({ type: 'PASS' })
+                  }}
                   disabled={!mustPass}
                 >
                   Pass
