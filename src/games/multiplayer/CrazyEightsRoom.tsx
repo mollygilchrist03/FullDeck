@@ -14,7 +14,7 @@ const SUIT_GLYPH: Record<Suit, string> = { HEARTS: '♥', DIAMONDS: '♦', CLUBS
 const SUITS: Suit[] = ['HEARTS', 'DIAMONDS', 'CLUBS', 'SPADES']
 const isRed = (s: Suit) => s === 'HEARTS' || s === 'DIAMONDS'
 
-export function CrazyEightsRoom({ view, send }: MpBoardProps) {
+export function CrazyEightsRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as CrazyEightsState
   const seat = view.youSeat ?? 0
   const spectator = view.youSeat === null
@@ -80,10 +80,11 @@ export function CrazyEightsRoom({ view, send }: MpBoardProps) {
             <button
               key={su}
               type="button"
+              disabled={sending}
               onClick={() => send({ type: 'CHOOSE_SUIT', suit: su, side })}
               className={`h-12 w-12 rounded-lg border border-gold/50 bg-felt text-2xl ${
                 isRed(su) ? 'text-casino' : 'text-card'
-              } hover:border-gold`}
+              } hover:border-gold disabled:opacity-60`}
               aria-label={su}
             >
               {SUIT_GLYPH[su]}
@@ -99,7 +100,7 @@ export function CrazyEightsRoom({ view, send }: MpBoardProps) {
               card={c}
               faceDown={false}
               onClick={myTurn && legal(i) ? () => send({ type: 'PLAY', index: i, side }) : undefined}
-              disabled={!myTurn || !legal(i)}
+              disabled={!myTurn || !legal(i) || sending}
               className={myTurn && legal(i) ? 'ring-2 ring-gold' : 'opacity-55'}
             />
           </div>
@@ -109,10 +110,18 @@ export function CrazyEightsRoom({ view, send }: MpBoardProps) {
       {myTurn && !iAwaitSuit && (
         <div className="flex flex-col items-center gap-1">
           <div className="flex gap-3">
-            <Button variant="ghost" onClick={() => send({ type: 'DRAW', side })} disabled={!mustDraw}>
+            <Button
+              variant="ghost"
+              onClick={() => send({ type: 'DRAW', side })}
+              disabled={!mustDraw || sending}
+            >
               Draw
             </Button>
-            <Button variant="accent" onClick={() => send({ type: 'PASS', side })} disabled={!mustPass}>
+            <Button
+              variant="accent"
+              onClick={() => send({ type: 'PASS', side })}
+              disabled={!mustPass || sending}
+            >
               Pass
             </Button>
           </div>

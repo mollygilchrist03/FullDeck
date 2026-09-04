@@ -2,7 +2,7 @@ import { Card } from '../../components/Card'
 import type { OldMaidState } from '../oldmaid/oldMaidReducer'
 import type { MpBoardProps } from './mpBoards'
 
-export function OldMaidRoom({ view, send }: MpBoardProps) {
+export function OldMaidRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as OldMaidState
   const seat = view.youSeat ?? 0
   const spectator = view.youSeat === null
@@ -25,7 +25,7 @@ export function OldMaidRoom({ view, send }: MpBoardProps) {
             <button
               key={i}
               type="button"
-              disabled={!myTurn}
+              disabled={!myTurn || sending}
               onClick={() => send({ type: 'DRAW', index: i })}
               className={`-ml-5 w-10 transition-transform first:ml-0 ${
                 myTurn ? 'hover:-translate-y-2' : ''

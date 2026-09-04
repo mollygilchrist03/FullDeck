@@ -22,7 +22,7 @@ const RANK_SHORT: Record<Rank, string> = {
 }
 const ORDER = Object.keys(RANK_SHORT)
 
-export function GoFishRoom({ view, send }: MpBoardProps) {
+export function GoFishRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as GoFishState
   const seat = view.youSeat ?? 0
   const spectator = view.youSeat === null
@@ -61,7 +61,7 @@ export function GoFishRoom({ view, send }: MpBoardProps) {
       <button
         type="button"
         onClick={() => send({ type: 'DRAW', side })}
-        disabled={!canDraw}
+        disabled={!canDraw || sending}
         className="flex flex-col items-center gap-1 disabled:opacity-60"
         aria-label="Fish from the stock"
       >
@@ -94,14 +94,24 @@ export function GoFishRoom({ view, send }: MpBoardProps) {
       {canAsk && (
         <div className="flex flex-wrap justify-center gap-2">
           {myRanks.map((r) => (
-            <Button key={r} variant="gold" onClick={() => send({ type: 'ASK', rank: r, side })}>
+            <Button
+              key={r}
+              variant="gold"
+              onClick={() => send({ type: 'ASK', rank: r, side })}
+              disabled={sending}
+            >
               {RANK_SHORT[r]}
             </Button>
           ))}
         </div>
       )}
       {canDraw && (
-        <Button size="lg" variant="accent" onClick={() => send({ type: 'DRAW', side })}>
+        <Button
+          size="lg"
+          variant="accent"
+          onClick={() => send({ type: 'DRAW', side })}
+          disabled={sending}
+        >
           🎣 Go fish
         </Button>
       )}

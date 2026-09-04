@@ -3,7 +3,7 @@ import { Card } from '../../components/Card'
 import { centerTop, isJack, type SlapjackState } from '../slapjack/slapjackReducer'
 import type { MpBoardProps } from './mpBoards'
 
-export function SlapjackRoom({ view, send }: MpBoardProps) {
+export function SlapjackRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as SlapjackState
   const seat = view.youSeat ?? 0
   const spectator = view.youSeat === null
@@ -58,7 +58,7 @@ export function SlapjackRoom({ view, send }: MpBoardProps) {
             variant="ghost"
             className="flex-1"
             onClick={() => send({ type: 'FLIP' })}
-            disabled={!canFlip}
+            disabled={!canFlip || sending}
           >
             Flip
           </Button>
@@ -67,7 +67,7 @@ export function SlapjackRoom({ view, send }: MpBoardProps) {
             variant="accent"
             className="flex-1"
             onClick={() => send({ type: 'SLAP', who: myRole })}
-            disabled={spectator}
+            disabled={spectator || sending}
           >
             Slap!
           </Button>

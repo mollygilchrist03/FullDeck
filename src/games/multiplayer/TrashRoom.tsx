@@ -36,7 +36,7 @@ function Row({
   )
 }
 
-export function TrashRoom({ view, send }: MpBoardProps) {
+export function TrashRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as TrashState
   const seat = view.youSeat ?? 0
   const spectator = view.youSeat === null
@@ -84,7 +84,7 @@ export function TrashRoom({ view, send }: MpBoardProps) {
       <Row
         slots={mySlots}
         label={`You — lay ${mySize}`}
-        onPick={myWild ? (i) => send({ type: 'PLACE_WILD', slot: i, side }) : undefined}
+        onPick={myWild && !sending ? (i) => send({ type: 'PLACE_WILD', slot: i, side }) : undefined}
       />
 
       <p className="min-h-5 max-w-md text-center text-sm text-card/75" role="status" aria-live="polite">
@@ -101,14 +101,19 @@ export function TrashRoom({ view, send }: MpBoardProps) {
 
       {myTurn && (
         <div className="flex gap-3">
-          <Button size="lg" variant="accent" onClick={() => send({ type: 'DRAW', side })}>
+          <Button
+            size="lg"
+            variant="accent"
+            onClick={() => send({ type: 'DRAW', side })}
+            disabled={sending}
+          >
             Draw
           </Button>
           <Button
             size="lg"
             variant="ghost"
             onClick={() => send({ type: 'TAKE_DISCARD', side })}
-            disabled={!discardTop}
+            disabled={!discardTop || sending}
           >
             Take discard
           </Button>
