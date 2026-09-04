@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm'
 import { getDb, isDbConfigured } from '../db/client.js'
-import { scores } from '../db/schema.js'
+import { scores, submissionLog } from '../db/schema.js'
 import {
   GAMES,
   isGameKey,
@@ -14,17 +15,46 @@ import { isCleanName } from '../src/lib/profanity.js'
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 50
 
-// Best-effort per-instance rate limit: 8 submissions / minute / IP.
+// Rate limit: 8 submissions / minute / IP. Backed by a `submission_log` table
+// rather than an in-memory Map — a Map only holds within one warm serverless
+// instance, so a burst that lands on several cold instances would sail
+// straight through it. Every attempt (valid or not) is logged first, so
+// spamming invalid bodies doesn't get a free pass around the limit.
 const RATE_WINDOW_MS = 60_000
 const RATE_MAX = 8
-const hits = new Map<string, number[]>()
+// Never store a raw IP — salt-and-hash it. The salt just needs to be secret
+// and stable; it doesn't need to be a real secret manager entry.
+const IP_SALT = process.env.IP_HASH_SALT ?? 'full-deck-rate-limit'
+// Cheap unbounded-growth guard: no cron job, so opportunistically sweep old
+// rows on a small fraction of requests instead.
+const CLEANUP_CHANCE = 0.02
+const LOG_RETENTION_MS = 60 * 60_000
 
-function rateLimited(ip: string): boolean {
-  const now = Date.now()
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS)
-  recent.push(now)
-  hits.set(ip, recent)
-  return recent.length > RATE_MAX
+function hashIp(ip: string): string {
+  return createHash('sha256').update(`${IP_SALT}:${ip}`).digest('hex')
+}
+
+/** Logs this attempt and reports whether the IP is already over the limit. */
+async function checkRateLimit(ip: string): Promise<boolean> {
+  const db = getDb()
+  const ipHash = hashIp(ip)
+  const since = new Date(Date.now() - RATE_WINDOW_MS)
+
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(submissionLog)
+    .where(and(eq(submissionLog.ipHash, ipHash), gt(submissionLog.createdAt, since)))
+
+  await db.insert(submissionLog).values({ ipHash })
+
+  if (Math.random() < CLEANUP_CHANCE) {
+    void db
+      .delete(submissionLog)
+      .where(lt(submissionLog.createdAt, new Date(Date.now() - LOG_RETENTION_MS)))
+      .catch(() => {})
+  }
+
+  return n >= RATE_MAX
 }
 
 function clientIp(req: VercelRequest): string {
@@ -84,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      if (rateLimited(clientIp(req))) {
+      if (await checkRateLimit(clientIp(req))) {
         res.status(429).json({ error: 'Slow down — too many submissions.' })
         return
       }

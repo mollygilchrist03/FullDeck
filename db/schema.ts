@@ -30,6 +30,24 @@ export type ScoreRow = typeof scores.$inferSelect
 export type NewScore = typeof scores.$inferInsert
 
 /**
+ * One row per score-submission attempt (valid or not), for a Postgres-backed
+ * rate limit that holds across serverless instances — the in-memory limiter in
+ * `api/scores.ts` only holds within one warm instance. `ipHash` is a salted
+ * SHA-256 of the submitter's IP, never the IP itself.
+ */
+export const submissionLog = pgTable(
+  'submission_log',
+  {
+    id: serial('id').primaryKey(),
+    ipHash: varchar('ip_hash', { length: 64 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('submission_log_ip_time_idx').on(t.ipHash, t.createdAt)],
+)
+
+export type SubmissionLogRow = typeof submissionLog.$inferSelect
+
+/**
  * One row per multiplayer room. `state` holds the game's reducer state (or null
  * in the lobby); `seats` is a fixed-length array of seat holders. `version`
  * increments on every mutation and drives long-poll updates.
