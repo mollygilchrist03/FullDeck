@@ -6,6 +6,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
+import { feedback } from '../../lib/feedback'
 import { initTrash, trashReducer, type Slot } from './trashReducer'
 
 const AI_STEP_MS = 850
@@ -60,6 +61,7 @@ export function Trash() {
         const playerFaceDown = c.slice(0, playerN)
         const aiFaceDown = c.slice(playerN, playerN + aiN)
         const stock = c.slice(playerN + aiN)
+        feedback('deal')
         dispatch(
           next
             ? { type: 'NEXT_ROUND', stock, playerFaceDown, aiFaceDown }
@@ -82,9 +84,16 @@ export function Trash() {
 
   useEffect(() => {
     if (state.phase !== 'aiTurn') return
-    const id = setTimeout(() => dispatch({ type: 'AI_STEP' }), AI_STEP_MS)
+    const id = setTimeout(() => {
+      feedback('flip')
+      dispatch({ type: 'AI_STEP' })
+    }, AI_STEP_MS)
     return () => clearTimeout(id)
   }, [state.phase, state.aiSteps])
+
+  useEffect(() => {
+    if (state.phase === 'gameover') feedback(state.matchWinner === 'player' ? 'win' : 'lose')
+  }, [state.phase, state.matchWinner])
 
   const nextRound = () => {
     const pN = state.roundWinner === 'player' ? state.playerSize - 1 : state.playerSize
@@ -159,7 +168,14 @@ export function Trash() {
           <Row
             slots={state.playerSlots}
             label={`You — lay ${state.playerSize}`}
-            onPick={state.phase === 'wildChoice' ? (i) => dispatch({ type: 'PLACE_WILD', slot: i }) : undefined}
+            onPick={
+          state.phase === 'wildChoice'
+            ? (i) => {
+                feedback('flip')
+                dispatch({ type: 'PLACE_WILD', slot: i })
+              }
+            : undefined
+        }
           />
 
           <p className="min-h-5 max-w-md text-center text-sm text-card/75" role="status" aria-live="polite">
@@ -174,13 +190,23 @@ export function Trash() {
 
           {myTurn && (
             <div className="flex gap-3">
-              <Button size="lg" variant="accent" onClick={() => dispatch({ type: 'DRAW' })}>
+              <Button
+                size="lg"
+                variant="accent"
+                onClick={() => {
+                  feedback('flip')
+                  dispatch({ type: 'DRAW' })
+                }}
+              >
                 Draw
               </Button>
               <Button
                 size="lg"
                 variant="ghost"
-                onClick={() => dispatch({ type: 'TAKE_DISCARD' })}
+                onClick={() => {
+                  feedback('flip')
+                  dispatch({ type: 'TAKE_DISCARD' })
+                }}
                 disabled={!discardTop}
               >
                 Take discard
