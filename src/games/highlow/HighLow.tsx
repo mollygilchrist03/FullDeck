@@ -61,7 +61,8 @@ export function HighLow() {
   )
 
   const shown = state.revealed ?? state.current
-  const over = state.phase === 'gameover'
+  const won = state.phase === 'won'
+  const over = state.phase === 'gameover' || won
 
   return (
     <Layout
@@ -160,7 +161,9 @@ export function HighLow() {
           {over && (
             <div className="flex flex-col items-center gap-3">
               <p className="font-display text-xl text-gold">
-                Run over at {state.streak} — best this session: {best}
+                {won
+                  ? `You called all 52 cards — deck cleared!`
+                  : `Run over at ${state.streak} — best this session: ${best}`}
               </p>
               {best >= 1 && <ScoreSubmit game="high-low" score={best} />}
               <Button size="lg" variant="gold" onClick={() => void startRun()}>

@@ -73,4 +73,15 @@ describe('highLowReducer', () => {
     const dead = highLowReducer(started(), { type: 'GUESS', guess: 'higher', next: card('3') })
     expect(highLowReducer(dead, { type: 'GUESS', guess: 'lower', next: card('2') })).toBe(dead)
   })
+
+  it('clearing all 52 cards is a win', () => {
+    // seen starts at 1; the 51st guess brings seen to 52.
+    const s = highLowReducer({ ...started(), seen: 51, streak: 50, current: card('2') }, {
+      type: 'GUESS',
+      guess: 'higher',
+      next: card('KING'),
+    })
+    expect(s.phase).toBe('won')
+    expect(s.streak).toBe(51)
+  })
 })

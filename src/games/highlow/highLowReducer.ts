@@ -1,7 +1,10 @@
 import type { Card } from '../../types/card'
 import { judge, type Guess, type Judgement } from './highLowLogic'
 
-export type HighLowPhase = 'idle' | 'guessing' | 'revealed' | 'gameover'
+export type HighLowPhase = 'idle' | 'guessing' | 'revealed' | 'gameover' | 'won'
+
+/** Cards in a single deck — clear them all without a wrong call and you win. */
+export const DECK_SIZE = 52
 
 export interface HighLowState {
   current: Card | null
@@ -42,14 +45,17 @@ export function highLowReducer(state: HighLowState, action: HighLowAction): High
     case 'GUESS': {
       if (state.phase !== 'guessing' || !state.current) return state
       const verdict = judge(state.current, action.next, action.guess)
+      const seen = state.seen + 1
+      const phase =
+        verdict === 'wrong' ? 'gameover' : seen >= DECK_SIZE ? 'won' : 'revealed'
       return {
         ...state,
         revealed: action.next,
         lastGuess: action.guess,
         lastJudgement: verdict,
         streak: verdict === 'correct' ? state.streak + 1 : state.streak,
-        seen: state.seen + 1,
-        phase: verdict === 'wrong' ? 'gameover' : 'revealed',
+        seen,
+        phase,
       }
     }
 
