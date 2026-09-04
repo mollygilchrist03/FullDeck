@@ -78,7 +78,9 @@ function bookAndCheck(state: GoFishState): GoFishState {
     log,
   }
 
-  if (playerBooks.length + aiBooks.length === 13) {
+  const allGone =
+    next.playerHand.length === 0 && next.aiHand.length === 0 && next.stock.length === 0
+  if (playerBooks.length + aiBooks.length === 13 || allGone) {
     const winner = playerBooks.length >= aiBooks.length ? 'player' : 'ai'
     return {
       ...next,
@@ -88,6 +90,22 @@ function bookAndCheck(state: GoFishState): GoFishState {
     }
   }
   return next
+}
+
+/**
+ * Hand the turn to the player. If their hand is empty but the stock isn't, they
+ * draw up first (Bicycle: you draw from the stock on your turn if you have no
+ * cards). If nothing can be drawn, the turn bounces back to the AI.
+ */
+function toPlayerTurn(state: GoFishState): GoFishState {
+  let s = state
+  while (s.phase !== 'gameover' && s.playerHand.length === 0 && s.stock.length > 0) {
+    const d = drawFor(s, 'player')
+    s = bookAndCheck({ ...d.state, log: push(d.state.log, 'Your hand was empty — you draw from the stock.') })
+  }
+  if (s.phase === 'gameover') return s
+  if (s.playerHand.length === 0) return { ...s, phase: 'aiTurn' }
+  return { ...s, phase: 'playerAsk' }
 }
 
 /** Draw one card into the given side's hand if the stock has any. */
@@ -115,7 +133,7 @@ export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishS
         stock: action.stock,
         log: ['Ask the dealer for a rank you already hold.'],
       }
-      return bookAndCheck(seeded)
+      return toPlayerTurn(bookAndCheck(seeded))
     }
 
     case 'ASK': {
@@ -153,7 +171,7 @@ export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishS
           : drawnState.log,
       })
       if (s.phase === 'gameover') return s
-      return { ...s, phase: gotWhatWeAsked ? 'playerAsk' : 'aiTurn' }
+      return gotWhatWeAsked ? toPlayerTurn(s) : { ...s, phase: 'aiTurn' }
     }
 
     case 'AI_STEP': {
@@ -165,7 +183,7 @@ export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishS
         // No cards to ask with — draw and pass.
         const { state: drawnState } = drawFor(stepped, 'ai')
         const s = bookAndCheck({ ...drawnState, log: push(drawnState.log, 'Dealer draws and passes.') })
-        return s.phase === 'gameover' ? s : { ...s, phase: 'playerAsk' }
+        return s.phase === 'gameover' ? s : toPlayerTurn(s)
       }
 
       const taken = state.playerHand.filter((c) => c.rank === ask)
@@ -189,7 +207,7 @@ export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishS
       const gotIt = drawn?.rank === ask
       const s = bookAndCheck(drawnState)
       if (s.phase === 'gameover') return s
-      return { ...s, phase: gotIt ? 'aiTurn' : 'playerAsk' }
+      return gotIt ? { ...s, phase: 'aiTurn' } : toPlayerTurn(s)
     }
 
     case 'RESET':

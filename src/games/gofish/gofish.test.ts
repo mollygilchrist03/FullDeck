@@ -78,6 +78,32 @@ describe('goFishReducer', () => {
     expect(s.aiSteps).toBe(1)
   })
 
+  it('an empty-handed player draws up from the stock instead of stalling', () => {
+    // AI clears the player's hand, then misses — turn comes back to an empty player.
+    let s = seed({
+      phase: 'aiTurn',
+      playerHand: hand('3'),
+      aiHand: hand('3', '3'),
+      stock: hand('9', 'KING'),
+    })
+    s = goFishReducer(s, { type: 'AI_STEP' }) // takes the player's 3, stays aiTurn
+    expect(s.playerHand).toHaveLength(0)
+    s = goFishReducer(s, { type: 'AI_STEP' }) // AI asks again, misses, go fish, hand back
+    expect(s.phase).toBe('playerAsk')
+    expect(s.playerHand.length).toBeGreaterThan(0)
+  })
+
+  it('ends the game if every card is gone even below thirteen books', () => {
+    const s = goFishReducer(initGoFish(), {
+      type: 'START',
+      playerHand: hand('4', '4', '4', '4'),
+      aiHand: [],
+      stock: [],
+    })
+    expect(s.phase).toBe('gameover')
+    expect(s.winner).toBe('player')
+  })
+
   it('ends when all thirteen books are made', () => {
     const almost = seed({
       playerBooks: ['2', '3', '4', '5', '6', '7'],
