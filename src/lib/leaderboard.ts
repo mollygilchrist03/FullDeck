@@ -113,7 +113,7 @@ export const GAMES: Record<GameKey, GameMeta> = {
     key: 'go-fish',
     title: 'Go Fish',
     metricLabel: 'Books collected',
-    metricHint: 'Complete sets of four you finished a winning game with.',
+    metricHint: 'Complete sets of four you collected in a finished game.',
     unit: '',
     unitPosition: 'none',
     higherIsBetter: true,

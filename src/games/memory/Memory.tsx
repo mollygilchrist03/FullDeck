@@ -131,10 +131,14 @@ export function Memory() {
               elapsedMs={elapsedMs}
               onPlayAgain={() => void deal(state.gridSize)}
             />
-            {state.gridSize === 6 && (
+            {state.gridSize === 6 ? (
               <div className="mx-auto">
                 <ScoreSubmit game="memory" score={Math.max(1, Math.round(elapsedMs / 1000))} />
               </div>
+            ) : (
+              <p className="text-center text-xs text-card/60">
+                Clear the 6×6 board to post a time to the leaderboard.
+              </p>
             )}
             <div className="pointer-events-none opacity-50">
               <Grid

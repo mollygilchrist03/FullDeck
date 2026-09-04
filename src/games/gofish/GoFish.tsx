@@ -188,7 +188,7 @@ export function GoFish() {
                   ? `You win ${state.playerBooks.length}–${state.aiBooks.length}!`
                   : `The dealer wins ${state.aiBooks.length}–${state.playerBooks.length}.`}
               </p>
-              {state.winner === 'player' && state.playerBooks.length >= 1 && (
+              {state.playerBooks.length >= 1 && (
                 <ScoreSubmit game="go-fish" score={state.playerBooks.length} />
               )}
               <Button size="lg" variant="gold" onClick={() => void newGame()}>

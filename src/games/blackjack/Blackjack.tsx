@@ -246,7 +246,7 @@ export function Blackjack() {
             </div>
           )}
 
-          {state.phase === 'settled' && peakBank > STARTING_BANK && (
+          {state.phase === 'settled' && (
             <div className="flex justify-center">
               <ScoreSubmit game="blackjack" score={peakBank} />
             </div>
