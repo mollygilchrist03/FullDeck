@@ -40,8 +40,11 @@ export const GAMES: Record<GameKey, GameMeta> = {
     unit: '$',
     unitPosition: 'prefix',
     higherIsBetter: true,
+    // Starts at $100 (STARTING_BANK); an unbounded session can genuinely climb
+    // a long way, but six figures is already a very generous ceiling on a
+    // single reported peak.
     min: 1,
-    max: 1_000_000,
+    max: 250_000,
   },
   memory: {
     key: 'memory',
@@ -51,8 +54,11 @@ export const GAMES: Record<GameKey, GameMeta> = {
     unit: 's',
     unitPosition: 'suffix',
     higherIsBetter: false,
+    // 30 minutes to clear 18 pairs is already an implausibly slow, genuine
+    // session — a submission above that is far more likely fabricated than
+    // played.
     min: 1,
-    max: 3600,
+    max: 1800,
   },
   'high-low': {
     key: 'high-low',
@@ -73,8 +79,10 @@ export const GAMES: Record<GameKey, GameMeta> = {
     unit: '',
     unitPosition: 'none',
     higherIsBetter: false,
+    // Won cards are shuffled back in so the game always terminates, but a
+    // real run of War can still go on for a while — leave real headroom.
     min: 1,
-    max: 5000,
+    max: 1000,
   },
   'video-poker': {
     key: 'video-poker',
@@ -84,8 +92,11 @@ export const GAMES: Record<GameKey, GameMeta> = {
     unit: '$',
     unitPosition: 'prefix',
     higherIsBetter: true,
+    // The true ceiling, not a guess: a royal flush at max bet (5) pays a flat
+    // 800/credit — see payout() in videopoker/paytable.ts. No legal hand can
+    // pay more than that.
     min: 1,
-    max: 100_000,
+    max: 800 * 5,
   },
   'crazy-eights': {
     key: 'crazy-eights',
@@ -106,7 +117,10 @@ export const GAMES: Record<GameKey, GameMeta> = {
     unit: '',
     unitPosition: 'none',
     higherIsBetter: false,
-    min: 60,
+    // Genuine simple visual-reaction time bottoms out around 150-200ms; a
+    // "reaction" under 100ms is anticipation (or a fabricated number), not a
+    // reaction to the Jack actually landing.
+    min: 100,
     max: 3000,
   },
   'go-fish': {
@@ -128,8 +142,9 @@ export const GAMES: Record<GameKey, GameMeta> = {
     unit: '',
     unitPosition: 'none',
     higherIsBetter: false,
+    // A 10-card row realistically resolves in a few dozen turns at most.
     min: 1,
-    max: 200,
+    max: 100,
   },
   'old-maid': {
     key: 'old-maid',
