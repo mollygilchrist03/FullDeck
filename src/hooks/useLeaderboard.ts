@@ -61,12 +61,14 @@ export async function submitScore(
   game: GameKey,
   name: string,
   score: number,
+  /** Honeypot — always empty from a real form. See ScoreSubmit's `website` field. */
+  website = '',
 ): Promise<SubmitResult> {
   try {
     const res = await fetch('/api/scores', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ game, name, score }),
+      body: JSON.stringify({ game, name, score, website }),
     })
     const data = await readJson(res)
     if (!res.ok) return { ok: false, error: (data.error as string) ?? 'Could not submit your score.' }

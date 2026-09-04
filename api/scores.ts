@@ -119,6 +119,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
       const body = (req.body ?? {}) as Record<string, unknown>
+
+      // Honeypot: a real form leaves `website` empty. A bot that blindly
+      // fills every input usually doesn't. Report success without touching
+      // the database — telling a bot "rejected" only teaches it to adapt.
+      if (typeof body.website === 'string' && body.website.trim() !== '') {
+        res.status(201).json({ ok: true })
+        return
+      }
+
       const { game } = body
       if (!isGameKey(game)) {
         res.status(400).json({ error: 'Unknown or missing game.' })

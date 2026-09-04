@@ -31,6 +31,7 @@ interface ScoreSubmitProps {
 export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
   const meta = GAMES[game]
   const [name, setName] = useState(loadName)
+  const [website, setWebsite] = useState('') // honeypot — see the field below
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
 
@@ -51,7 +52,7 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
     setStatus('sending')
     setMessage(null)
     rememberName(trimmed)
-    const result = await submitScore(game, trimmed, score)
+    const result = await submitScore(game, trimmed, score, website)
     if (result.ok) {
       setStatus('done')
       setMessage(result.rank ? `Logged — you're #${result.rank}.` : 'Logged.')
@@ -79,6 +80,19 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
               placeholder="Your name"
               className="min-w-0 flex-1 rounded-lg border border-gold/40 bg-felt px-3 py-2 text-sm text-card placeholder:text-card/40 focus:border-gold focus:outline-none"
               onKeyDown={(e) => e.key === 'Enter' && void send()}
+            />
+            {/* Honeypot: invisible to a real visitor (off-screen, unlabelled,
+                skipped by tab order and screen readers), but a form-filling
+                bot that populates every input tends to fill it in. */}
+            <input
+              type="text"
+              name="website"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              tabIndex={-1}
+              aria-hidden="true"
+              autoComplete="off"
+              className="absolute left-[-9999px] h-0 w-0 opacity-0"
             />
             <Button variant="gold" onClick={() => void send()} disabled={status === 'sending'}>
               {status === 'sending' ? '…' : 'Submit'}
