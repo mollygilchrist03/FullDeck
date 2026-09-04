@@ -71,7 +71,7 @@ export function GoFish() {
   }, [newGame])
 
   useEffect(() => {
-    if (state.phase !== 'aiTurn') return
+    if (state.phase !== 'aiAsk' && state.phase !== 'aiDraw') return
     const id = setTimeout(() => dispatch({ type: 'AI_STEP' }), AI_STEP_MS)
     return () => clearTimeout(id)
   }, [state.phase, state.aiSteps])

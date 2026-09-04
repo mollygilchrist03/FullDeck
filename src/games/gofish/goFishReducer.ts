@@ -1,7 +1,8 @@
 import type { Card, Rank } from '../../types/card'
-import { chooseAiAsk, countRank, takeBooks } from './goFishLogic'
+import { chooseAiAsk, countRank, takeBooks } from './goFishLogic.js'
 
-export type GoFishPhase = 'playerAsk' | 'playerDraw' | 'aiTurn' | 'gameover'
+export type Side = 'player' | 'ai'
+export type GoFishPhase = 'playerAsk' | 'playerDraw' | 'aiAsk' | 'aiDraw' | 'gameover'
 
 export interface GoFishState {
   playerHand: Card[]
@@ -10,10 +11,7 @@ export interface GoFishState {
   playerBooks: Rank[]
   aiBooks: Rank[]
   phase: GoFishPhase
-  /**
-   * During 'playerDraw': the rank the player asked for. If the card they fish up
-   * matches, their turn continues. Null for an empty-hand "draw up".
-   */
+  /** During a *Draw phase: the rank that side asked for (null for a draw-up). */
   pendingRank: Rank | null
   /** Ranks the player has asked for — the AI's memory. */
   knownPlayerRanks: Rank[]
@@ -21,13 +19,13 @@ export interface GoFishState {
   aiSteps: number
   turnsTaken: number
   log: string[]
-  winner: 'player' | 'ai' | null
+  winner: Side | null
 }
 
 export type GoFishAction =
   | { type: 'START'; playerHand: Card[]; aiHand: Card[]; stock: Card[] }
-  | { type: 'ASK'; rank: Rank }
-  | { type: 'DRAW' }
+  | { type: 'ASK'; rank: Rank; side?: Side }
+  | { type: 'DRAW'; side?: Side }
   | { type: 'AI_STEP' }
   | { type: 'RESET' }
 
@@ -48,6 +46,13 @@ const RANK_LABEL: Record<Rank, string> = {
 }
 
 const push = (log: string[], line: string): string[] => [...log, line].slice(-6)
+const other = (s: Side): Side => (s === 'player' ? 'ai' : 'player')
+const handOf = (st: GoFishState, s: Side) => (s === 'player' ? st.playerHand : st.aiHand)
+const withHand = (st: GoFishState, s: Side, h: Card[]): GoFishState =>
+  s === 'player' ? { ...st, playerHand: h } : { ...st, aiHand: h }
+const name = (s: Side) => (s === 'player' ? 'You' : 'The dealer')
+const askPhase = (s: Side): GoFishPhase => (s === 'player' ? 'playerAsk' : 'aiAsk')
+const drawPhase = (s: Side): GoFishPhase => (s === 'player' ? 'playerDraw' : 'aiDraw')
 
 export function initGoFish(): GoFishState {
   return {
@@ -88,7 +93,7 @@ function bookAndCheck(state: GoFishState): GoFishState {
   const allGone =
     next.playerHand.length === 0 && next.aiHand.length === 0 && next.stock.length === 0
   if (playerBooks.length + aiBooks.length === 13 || allGone) {
-    const winner = playerBooks.length >= aiBooks.length ? 'player' : 'ai'
+    const winner: Side = playerBooks.length >= aiBooks.length ? 'player' : 'ai'
     return {
       ...next,
       phase: 'gameover',
@@ -99,34 +104,79 @@ function bookAndCheck(state: GoFishState): GoFishState {
   return next
 }
 
-/**
- * Hand the turn to the player. With cards in hand they ask; with an empty hand
- * and a live stock they must click to draw up (Bicycle rule); with nothing to
- * draw the turn bounces back to the AI.
- */
-function toPlayerTurn(state: GoFishState): GoFishState {
+/** Hand the turn to `side`; draw up first if their hand is empty. */
+function toTurn(state: GoFishState, side: Side): GoFishState {
   if (state.phase === 'gameover') return state
-  if (state.playerHand.length === 0) {
-    return state.stock.length > 0
-      ? { ...state, phase: 'playerDraw', pendingRank: null }
-      : { ...state, phase: 'aiTurn' }
-  }
-  return { ...state, phase: 'playerAsk', pendingRank: null }
+  const s = { ...state, pendingRank: null }
+  if (handOf(s, side).length > 0) return { ...s, phase: askPhase(side) }
+  if (s.stock.length > 0) return { ...s, phase: drawPhase(side) }
+  // Empty hand, empty stock. Pass to the other side if they can still play.
+  if (handOf(s, other(side)).length > 0) return { ...s, phase: askPhase(other(side)) }
+  return s // bookAndCheck's all-gone guard will have ended it
 }
 
-/** Draw one card into the given side's hand if the stock has any. */
-function drawFor(state: GoFishState, side: 'player' | 'ai'): { state: GoFishState; drawn: Card | null } {
+function drawFor(state: GoFishState, side: Side): { state: GoFishState; drawn: Card | null } {
   if (state.stock.length === 0) return { state, drawn: null }
   const [drawn, ...stock] = state.stock
-  return {
-    state: {
-      ...state,
-      stock,
-      playerHand: side === 'player' ? [...state.playerHand, drawn] : state.playerHand,
-      aiHand: side === 'ai' ? [...state.aiHand, drawn] : state.aiHand,
-    },
-    drawn,
+  return { state: withHand({ ...state, stock }, side, [...handOf(state, side), drawn]), drawn }
+}
+
+function doAsk(state: GoFishState, asker: Side, rank: Rank): GoFishState {
+  if (state.phase !== askPhase(asker)) return state
+  if (countRank(handOf(state, asker), rank) === 0) return state
+  const opp = other(asker)
+  const known =
+    asker === 'player' && !state.knownPlayerRanks.includes(rank)
+      ? [...state.knownPlayerRanks, rank]
+      : state.knownPlayerRanks
+  const turnsTaken = asker === 'player' ? state.turnsTaken + 1 : state.turnsTaken
+  const taken = handOf(state, opp).filter((c) => c.rank === rank)
+
+  if (taken.length > 0) {
+    let s: GoFishState = { ...state, knownPlayerRanks: known, turnsTaken }
+    s = withHand(s, asker, [...handOf(s, asker), ...taken])
+    s = withHand(s, opp, handOf(s, opp).filter((c) => c.rank !== rank))
+    return bookAndCheck({
+      ...s,
+      log: push(state.log, `${name(opp)} hands over ${taken.length} × ${RANK_LABEL[rank]}. Go again.`),
+    })
   }
+
+  return {
+    ...state,
+    knownPlayerRanks: known,
+    turnsTaken,
+    phase: drawPhase(asker),
+    pendingRank: rank,
+    log: push(state.log, `No ${RANK_LABEL[rank]} — ${asker === 'player' ? 'go fish. Draw a card.' : 'the dealer fishes.'}`),
+  }
+}
+
+function doDraw(state: GoFishState, drawer: Side): GoFishState {
+  if (state.phase !== drawPhase(drawer)) return state
+  if (state.stock.length === 0) return toTurn(state, other(drawer))
+
+  const { state: drawnState, drawn } = drawFor(state, drawer)
+  const matched = state.pendingRank != null && drawn?.rank === state.pendingRank
+  const s = bookAndCheck({
+    ...drawnState,
+    log: push(
+      drawnState.log,
+      matched
+        ? `${name(drawer)} fished the ${RANK_LABEL[state.pendingRank!].replace(/s$/, '')} — go again!`
+        : `${name(drawer)} fished a ${RANK_LABEL[drawn!.rank].replace(/s$/, '')}.`,
+    ),
+  })
+  if (s.phase === 'gameover') return s
+
+  if (state.pendingRank != null) {
+    return matched
+      ? { ...s, phase: askPhase(drawer), pendingRank: null }
+      : toTurn({ ...s, pendingRank: null }, other(drawer))
+  }
+  // Draw-up.
+  if (handOf(s, drawer).length > 0) return { ...s, phase: askPhase(drawer) }
+  return s.stock.length > 0 ? { ...s, phase: drawPhase(drawer) } : toTurn(s, other(drawer))
 }
 
 export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishState {
@@ -139,103 +189,25 @@ export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishS
         stock: action.stock,
         log: ['Ask the dealer for a rank you already hold.'],
       }
-      return toPlayerTurn(bookAndCheck(seeded))
+      return toTurn(bookAndCheck(seeded), 'player')
     }
 
-    case 'ASK': {
-      if (state.phase !== 'playerAsk') return state
-      if (countRank(state.playerHand, action.rank) === 0) return state
-      const known = state.knownPlayerRanks.includes(action.rank)
-        ? state.knownPlayerRanks
-        : [...state.knownPlayerRanks, action.rank]
+    case 'ASK':
+      return doAsk(state, action.side ?? 'player', action.rank)
 
-      const taken = state.aiHand.filter((c) => c.rank === action.rank)
-      const turnsTaken = state.turnsTaken + 1
-
-      if (taken.length > 0) {
-        const s = bookAndCheck({
-          ...state,
-          knownPlayerRanks: known,
-          turnsTaken,
-          playerHand: [...state.playerHand, ...taken],
-          aiHand: state.aiHand.filter((c) => c.rank !== action.rank),
-          log: push(state.log, `Dealer hands over ${taken.length} × ${RANK_LABEL[action.rank]}. Go again.`),
-        })
-        return s
-      }
-
-      // Go fish — the player has to click the stock to draw.
-      return {
-        ...state,
-        knownPlayerRanks: known,
-        turnsTaken,
-        phase: 'playerDraw',
-        pendingRank: action.rank,
-        log: push(state.log, `No ${RANK_LABEL[action.rank]} — go fish. Draw a card.`),
-      }
-    }
-
-    case 'DRAW': {
-      if (state.phase !== 'playerDraw') return state
-      if (state.stock.length === 0) {
-        return { ...state, phase: 'aiTurn', pendingRank: null, log: push(state.log, 'Nothing left to fish.') }
-      }
-      const { state: drawnState, drawn } = drawFor(state, 'player')
-      const matched = state.pendingRank != null && drawn?.rank === state.pendingRank
-      const s = bookAndCheck({
-        ...drawnState,
-        log: push(
-          drawnState.log,
-          matched
-            ? `You fished the ${RANK_LABEL[state.pendingRank!].replace(/s$/, '')} you asked for — go again!`
-            : `You fished a ${RANK_LABEL[drawn!.rank].replace(/s$/, '')}.`,
-        ),
-      })
-      if (s.phase === 'gameover') return s
-      if (state.pendingRank != null) {
-        return matched
-          ? { ...s, phase: 'playerAsk', pendingRank: null }
-          : { ...s, phase: 'aiTurn', pendingRank: null }
-      }
-      // Draw-up: keep drawing until the player has a card or the stock runs out.
-      if (s.playerHand.length > 0) return { ...s, phase: 'playerAsk' }
-      return s.stock.length > 0 ? { ...s, phase: 'playerDraw' } : { ...s, phase: 'aiTurn' }
-    }
+    case 'DRAW':
+      return doDraw(state, action.side ?? 'player')
 
     case 'AI_STEP': {
-      if (state.phase !== 'aiTurn') return state
+      if (state.phase !== 'aiAsk' && state.phase !== 'aiDraw') return state
       const stepped = { ...state, aiSteps: state.aiSteps + 1 }
+      if (stepped.phase === 'aiDraw') return doDraw(stepped, 'ai')
       const ask = chooseAiAsk(state.aiHand, state.knownPlayerRanks)
-
-      if (!ask) {
-        // No cards to ask with — draw and pass.
-        const { state: drawnState } = drawFor(stepped, 'ai')
-        const s = bookAndCheck({ ...drawnState, log: push(drawnState.log, 'Dealer draws and passes.') })
-        return s.phase === 'gameover' ? s : toPlayerTurn(s)
-      }
-
-      const taken = state.playerHand.filter((c) => c.rank === ask)
-      const turnsTaken = state.turnsTaken + 1
-
-      if (taken.length > 0) {
-        const s = bookAndCheck({
-          ...stepped,
-          turnsTaken,
-          aiHand: [...state.aiHand, ...taken],
-          playerHand: state.playerHand.filter((c) => c.rank !== ask),
-          log: push(state.log, `Dealer asks for ${RANK_LABEL[ask]} — you hand over ${taken.length}.`),
-        })
-        return s // stays aiTurn -> the container steps the AI again
-      }
-
-      const { state: drawnState, drawn } = drawFor(
-        { ...stepped, turnsTaken, log: push(state.log, `Dealer asks for ${RANK_LABEL[ask]}. Go fish.`) },
-        'ai',
-      )
-      const gotIt = drawn?.rank === ask
-      const s = bookAndCheck(drawnState)
-      if (s.phase === 'gameover') return s
-      return gotIt ? { ...s, phase: 'aiTurn' } : toPlayerTurn(s)
+      if (ask) return doAsk(stepped, 'ai', ask)
+      // No cards to ask with.
+      return stepped.stock.length > 0
+        ? { ...stepped, phase: 'aiDraw', pendingRank: null }
+        : toTurn(stepped, 'player')
     }
 
     case 'RESET':

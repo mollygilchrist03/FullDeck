@@ -62,7 +62,7 @@ describe('goFishReducer', () => {
     expect(s.playerHand).toHaveLength(3) // not drawn yet
     s = goFishReducer(s, { type: 'DRAW' })
     expect(s.playerHand).toHaveLength(4) // drew the KING
-    expect(s.phase).toBe('aiTurn')
+    expect(s.phase).toBe('aiAsk')
   })
 
   it('fishing exactly what you asked for lets you go again', () => {
@@ -74,25 +74,28 @@ describe('goFishReducer', () => {
   })
 
   it('AI_STEP takes from the player on a hit and steps again', () => {
-    const s = goFishReducer(seed({ phase: 'aiTurn' }), { type: 'AI_STEP' })
-    // AI holds two 3s; player holds one 3 -> AI takes it, stays aiTurn.
+    const s = goFishReducer(seed({ phase: 'aiAsk' }), { type: 'AI_STEP' })
+    // AI holds two 3s; player holds one 3 -> AI takes it, stays aiAsk.
     expect(s.aiHand.filter((c) => c.rank === '3')).toHaveLength(3)
-    expect(s.phase).toBe('aiTurn')
+    expect(s.phase).toBe('aiAsk')
     expect(s.aiSteps).toBe(1)
   })
 
   it('an empty-handed player draws up from the stock instead of stalling', () => {
-    // AI clears the player's hand, then misses — turn comes back to an empty player.
+    // AI clears the player's hand, then misses and fishes; the turn returns to
+    // an empty player, who must draw up.
     let s = seed({
-      phase: 'aiTurn',
+      phase: 'aiAsk',
       playerHand: hand('3'),
       aiHand: hand('3', '3'),
       stock: hand('9', 'KING'),
     })
-    s = goFishReducer(s, { type: 'AI_STEP' }) // takes the player's 3, stays aiTurn
+    s = goFishReducer(s, { type: 'AI_STEP' }) // takes the player's 3
     expect(s.playerHand).toHaveLength(0)
-    s = goFishReducer(s, { type: 'AI_STEP' }) // AI asks again, misses, turn back to empty player
-    expect(s.phase).toBe('playerDraw') // must click to draw up
+    s = goFishReducer(s, { type: 'AI_STEP' }) // asks again, misses -> aiDraw
+    expect(s.phase).toBe('aiDraw')
+    s = goFishReducer(s, { type: 'AI_STEP' }) // AI fishes a 9 (no match) -> turn to empty player
+    expect(s.phase).toBe('playerDraw')
     expect(s.pendingRank).toBeNull()
     s = goFishReducer(s, { type: 'DRAW' })
     expect(s.phase).toBe('playerAsk')

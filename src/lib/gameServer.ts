@@ -18,6 +18,7 @@ import {
   initCrazyEights,
   HAND_SIZE as CE_HAND,
 } from '../games/crazyeights/crazyEightsReducer.js'
+import { goFishReducer, initGoFish } from '../games/gofish/goFishReducer.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyState = any
@@ -103,11 +104,33 @@ const crazyEights: GameServer = {
   isOver: (s) => s.phase === 'gameover',
 }
 
+const goFish: GameServer = {
+  deal: (c) =>
+    goFishReducer(initGoFish(), {
+      type: 'START',
+      playerHand: c.slice(0, 7),
+      aiHand: c.slice(7, 14),
+      stock: c.slice(14),
+    }),
+  reduce: goFishReducer,
+  authorize: (s, seat, a) => {
+    if (s.phase === 'gameover') return false
+    const want = role(seat)
+    const side = a?.side ?? 'player'
+    if (side !== want) return false
+    if (a?.type === 'ASK') return s.phase === (want === 'player' ? 'playerAsk' : 'aiAsk')
+    if (a?.type === 'DRAW') return s.phase === (want === 'player' ? 'playerDraw' : 'aiDraw')
+    return false
+  },
+  isOver: (s) => s.phase === 'gameover',
+}
+
 export const GAME_SERVERS: Partial<Record<MpGameKey, GameServer>> = {
   war,
   slapjack,
   'old-maid': oldMaid,
   'crazy-eights': crazyEights,
+  'go-fish': goFish,
 }
 
 /** Fetch a fresh shuffled 52-card deck (server-side). */
