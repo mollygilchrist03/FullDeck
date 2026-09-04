@@ -57,7 +57,7 @@ describe('isValidScore', () => {
 describe('sortDirection', () => {
   it('is desc for higher-is-better games, asc otherwise', () => {
     expect(sortDirection('high-low')).toBe('desc')
-    expect(sortDirection('video-poker')).toBe('desc')
+    expect(sortDirection('holdem')).toBe('desc')
     expect(sortDirection('memory')).toBe('asc')
     expect(sortDirection('war')).toBe('asc')
   })

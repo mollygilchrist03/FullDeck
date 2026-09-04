@@ -8,7 +8,7 @@ export type GameKey =
   | 'memory'
   | 'high-low'
   | 'war'
-  | 'video-poker'
+  | 'holdem'
   | 'crazy-eights'
   | 'slapjack'
   | 'go-fish'
@@ -84,19 +84,19 @@ export const GAMES: Record<GameKey, GameMeta> = {
     min: 1,
     max: 1000,
   },
-  'video-poker': {
-    key: 'video-poker',
-    title: 'Video Poker',
-    metricLabel: 'Biggest win',
-    metricHint: 'Largest payout from a single hand.',
+  holdem: {
+    key: 'holdem',
+    title: "Texas Hold'em",
+    metricLabel: 'Peak stack',
+    metricHint: 'The highest your chip stack reached in a match you won.',
     unit: '$',
     unitPosition: 'prefix',
     higherIsBetter: true,
-    // The true ceiling, not a guess: a royal flush at max bet (5) pays a flat
-    // 800/credit — see payout() in videopoker/paytable.ts. No legal hand can
-    // pay more than that.
+    // Starts at $200; only reported when you win the match, so it's at most
+    // both stacks combined at any point in the run ($400) plus whatever
+    // you'd built up before the final hand — generous, but not unbounded.
     min: 1,
-    max: 800 * 5,
+    max: 5_000,
   },
   'crazy-eights': {
     key: 'crazy-eights',

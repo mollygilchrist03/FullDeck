@@ -10,9 +10,7 @@ const Blackjack = lazy(() => import('./games/blackjack/Blackjack').then((m) => (
 const Memory = lazy(() => import('./games/memory/Memory').then((m) => ({ default: m.Memory })))
 const War = lazy(() => import('./games/war/War').then((m) => ({ default: m.War })))
 const HighLow = lazy(() => import('./games/highlow/HighLow').then((m) => ({ default: m.HighLow })))
-const VideoPoker = lazy(() =>
-  import('./games/videopoker/VideoPoker').then((m) => ({ default: m.VideoPoker })),
-)
+const HoldEm = lazy(() => import('./games/holdem/HoldEm').then((m) => ({ default: m.HoldEm })))
 const CrazyEights = lazy(() =>
   import('./games/crazyeights/CrazyEights').then((m) => ({ default: m.CrazyEights })),
 )
@@ -40,7 +38,7 @@ export function App() {
         <Route path="/memory" element={<Memory />} />
         <Route path="/war" element={<War />} />
         <Route path="/high-low" element={<HighLow />} />
-        <Route path="/video-poker" element={<VideoPoker />} />
+        <Route path="/holdem" element={<HoldEm />} />
         <Route path="/crazy-eights" element={<CrazyEights />} />
         <Route path="/slapjack" element={<Slapjack />} />
         <Route path="/go-fish" element={<GoFish />} />

@@ -61,9 +61,9 @@ export function Hub() {
           glyph="♣"
         />
         <GameCard
-          to="/video-poker"
-          title="Video Poker"
-          blurb="Jacks or Better. Deal five, hold what you want, draw the rest, and get paid on the poker hand."
+          to="/holdem"
+          title="Texas Hold'em"
+          blurb="Heads-up, no-limit, against the house. Bet, call, raise, or fold your way through the flop, turn, and river."
           glyph="♠"
         />
         <GameCard
