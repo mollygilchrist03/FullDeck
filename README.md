@@ -19,7 +19,7 @@ join-code room, not just against the built-in AI.
 
 ![Blackjack — a hand in progress with the dealer's hole card face-down and the chip stack](docs/screenshots/blackjack.png)
 
-![Texas Hold'em — heads-up against the house, mid-hand with the flop on the board](docs/screenshots/holdem.png)
+![Texas Hold'em — heads-up against the house, mid-hand with four community cards down](docs/screenshots/holdem.png)
 
 ## What it does
 
