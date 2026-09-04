@@ -10,7 +10,9 @@ interface LayoutProps {
 }
 
 export function Layout({ title, action, children }: LayoutProps) {
-  const onLeaderboard = useLocation().pathname === '/leaderboard'
+  const path = useLocation().pathname
+  const onLeaderboard = path === '/leaderboard'
+  const onMultiplayer = path === '/multiplayer' || path.startsWith('/room/')
 
   return (
     <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 pb-36 pt-4 sm:pb-8">
@@ -30,6 +32,15 @@ export function Layout({ title, action, children }: LayoutProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {!onMultiplayer && (
+            <Link
+              to="/multiplayer"
+              className="rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5"
+              aria-label="Play with a friend"
+            >
+              👥<span className="ml-1 hidden sm:inline">Friend</span>
+            </Link>
+          )}
           {!onLeaderboard && (
             <Link
               to="/leaderboard"

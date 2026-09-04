@@ -1,5 +1,5 @@
 import type { Card } from '../../types/card'
-import { firstOpenSlot, isLayoutComplete, placementFor } from './trashLogic'
+import { firstOpenSlot, isLayoutComplete, placementFor } from './trashLogic.js'
 
 export const START_SIZE = 10
 
@@ -11,6 +11,7 @@ export interface Slot {
 }
 
 export type TrashPhase = 'playerTurn' | 'wildChoice' | 'aiTurn' | 'roundOver' | 'gameover'
+export type Side = 'player' | 'ai'
 
 export interface TrashState {
   stock: Card[]
@@ -30,15 +31,18 @@ export interface TrashState {
   aiSteps: number
   /** Consecutive turns that passed with no card drawn (dead deck). */
   stalePasses: number
+  /** True in solo play — winning a round shrinks the layout for the next one.
+   *  False online — the first cleared row wins outright. */
+  soloLadder: boolean
   phase: TrashPhase
   log: string[]
 }
 
 export type TrashAction =
   | { type: 'START'; stock: Card[]; playerFaceDown: Card[]; aiFaceDown: Card[] }
-  | { type: 'DRAW' }
-  | { type: 'TAKE_DISCARD' }
-  | { type: 'PLACE_WILD'; slot: number }
+  | { type: 'DRAW'; side?: Side; auto?: boolean }
+  | { type: 'TAKE_DISCARD'; side?: Side; auto?: boolean }
+  | { type: 'PLACE_WILD'; slot: number; side?: Side }
   | { type: 'AI_STEP' }
   | { type: 'NEXT_ROUND'; stock: Card[]; playerFaceDown: Card[]; aiFaceDown: Card[] }
   | { type: 'RESET' }
@@ -62,6 +66,7 @@ export function initTrash(): TrashState {
     playerTurns: 0,
     aiSteps: 0,
     stalePasses: 0,
+    soloLadder: true,
     phase: 'playerTurn',
     log: [],
   }
@@ -72,7 +77,7 @@ export function initTrash(): TrashState {
  * swapped-up cards; stops at a dead card, a filled slot, a wild that needs a
  * choice (player only), or a completed layout.
  */
-function resolve(state: TrashState): TrashState {
+function resolve(state: TrashState, auto = false): TrashState {
   let s = state
   // Safety bound — a layout can't chain more than its size.
   for (let guard = 0; guard < START_SIZE + 2; guard += 1) {
@@ -89,7 +94,7 @@ function resolve(state: TrashState): TrashState {
     if (where === 'wild') {
       const open = firstOpenSlot(slots)
       if (open === -1) return roundWin(s, side)
-      if (side === 'player') return { ...s, phase: 'wildChoice' }
+      if (!auto) return { ...s, phase: 'wildChoice' }
       s = lock(s, side, open)
       continue
     }
@@ -154,14 +159,19 @@ function endTurn(state: TrashState, message: string, forced = false): TrashState
 function roundWin(state: TrashState, side: 'player' | 'ai'): TrashState {
   const winnerSize = side === 'player' ? state.playerSize : state.aiSize
   const playerTurns = state.turn === 'player' ? state.playerTurns + 1 : state.playerTurns
-  if (winnerSize === 1) {
+  if (winnerSize === 1 || !state.soloLadder) {
     return {
       ...state,
       held: null,
       playerTurns,
       matchWinner: side,
       phase: 'gameover',
-      log: push(state.log, `${label(side)} completed a single-card layout — ${label(side)} win the match!`),
+      log: push(
+        state.log,
+        state.soloLadder
+          ? `${label(side)} completed a single-card layout — ${label(side)} win the match!`
+          : `${label(side)} cleared the row — ${label(side)} win!`,
+      ),
     }
   }
   return {
@@ -174,11 +184,11 @@ function roundWin(state: TrashState, side: 'player' | 'ai'): TrashState {
   }
 }
 
-function drawInto(state: TrashState, source: 'stock' | 'discard'): TrashState {
+function drawInto(state: TrashState, source: 'stock' | 'discard', auto = false): TrashState {
   if (source === 'discard') {
     if (state.discard.length === 0) return state
     const held = state.discard[state.discard.length - 1]
-    return resolve({ ...state, held, discard: state.discard.slice(0, -1) })
+    return resolve({ ...state, held, discard: state.discard.slice(0, -1) }, auto)
   }
   if (state.stock.length === 0) {
     // Recycle the discard (minus its top) into the stock.
@@ -187,10 +197,11 @@ function drawInto(state: TrashState, source: 'stock' | 'discard'): TrashState {
     return drawInto(
       { ...state, stock: shuffle(state.discard.slice(0, -1)), discard: [top] },
       'stock',
+      auto,
     )
   }
   const [held, ...stock] = state.stock
-  return resolve({ ...state, held, stock })
+  return resolve({ ...state, held, stock }, auto)
 }
 
 function shuffle(cards: Card[]): Card[] {
@@ -215,20 +226,29 @@ export function trashReducer(state: TrashState, action: TrashAction): TrashState
         log: ['Draw a card and slot it into its position (Ace = 1). Queens are wild.'],
       }
 
-    case 'DRAW':
-      if (state.phase !== 'playerTurn') return state
-      return drawInto(state, 'stock')
+    case 'DRAW': {
+      const side = action.side ?? 'player'
+      const want = side === 'player' ? 'playerTurn' : 'aiTurn'
+      if (state.phase !== want || state.turn !== side) return state
+      return drawInto(state, 'stock', action.auto ?? false)
+    }
 
-    case 'TAKE_DISCARD':
-      if (state.phase !== 'playerTurn' || state.discard.length === 0) return state
-      return drawInto(state, 'discard')
+    case 'TAKE_DISCARD': {
+      const side = action.side ?? 'player'
+      const want = side === 'player' ? 'playerTurn' : 'aiTurn'
+      if (state.phase !== want || state.turn !== side || state.discard.length === 0) return state
+      return drawInto(state, 'discard', action.auto ?? false)
+    }
 
     case 'PLACE_WILD': {
-      if (state.phase !== 'wildChoice') return state
-      const slots = state.playerSlots
+      const side = action.side ?? 'player'
+      if (state.phase !== 'wildChoice' || state.turn !== side) return state
+      const slots = side === 'player' ? state.playerSlots : state.aiSlots
       if (action.slot < 0 || action.slot >= slots.length || slots[action.slot].locked) return state
-      const locked = lock({ ...state, phase: 'playerTurn' }, 'player', action.slot)
-      return resolve(isLayoutComplete(locked.playerSlots) ? roundWin(locked, 'player') : locked)
+      const back = side === 'player' ? 'playerTurn' : 'aiTurn'
+      const locked = lock({ ...state, phase: back }, side, action.slot)
+      const filled = side === 'player' ? locked.playerSlots : locked.aiSlots
+      return resolve(isLayoutComplete(filled) ? roundWin(locked, side) : locked)
     }
 
     case 'AI_STEP': {
@@ -242,7 +262,7 @@ export function trashReducer(state: TrashState, action: TrashAction): TrashState
           const w = placementFor(top, state.aiSize)
           return w === 'wild' || (typeof w === 'number' && !state.aiSlots[w].locked)
         })()
-      return drawInto(stepped, useful ? 'discard' : 'stock')
+      return drawInto(stepped, useful ? 'discard' : 'stock', true)
     }
 
     case 'NEXT_ROUND': {

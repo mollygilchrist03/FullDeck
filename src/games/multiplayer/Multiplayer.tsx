@@ -76,7 +76,7 @@ export function Multiplayer() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={16}
-            placeholder="e.g. Molly"
+            placeholder="Your name"
             className="rounded-lg border border-gold/40 bg-felt px-3 py-2 text-card placeholder:text-card/40 focus:border-gold focus:outline-none"
           />
         </label>

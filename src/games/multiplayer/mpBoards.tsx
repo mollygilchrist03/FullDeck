@@ -7,6 +7,7 @@ import { SlapjackRoom } from './SlapjackRoom'
 import { OldMaidRoom } from './OldMaidRoom'
 import { CrazyEightsRoom } from './CrazyEightsRoom'
 import { GoFishRoom } from './GoFishRoom'
+import { TrashRoom } from './TrashRoom'
 
 export interface MpBoardProps {
   view: RoomView
@@ -51,6 +52,7 @@ const BOARDS: Partial<Record<MpGameKey, (p: MpBoardProps) => ReactNode>> = {
   'old-maid': OldMaidRoom,
   'crazy-eights': CrazyEightsRoom,
   'go-fish': GoFishRoom,
+  trash: TrashRoom,
 }
 
 export function MpBoard(props: MpBoardProps): ReactNode {
