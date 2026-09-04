@@ -6,6 +6,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
+import { feedback } from '../../lib/feedback'
 import { centerTop, initSlapjack, isJack, slapjackReducer } from './slapjackReducer'
 
 const rand = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo))
@@ -26,6 +27,7 @@ export function Slapjack() {
     setBestMs(null)
     try {
       const cards = await drawCards(52)
+      feedback('deal')
       dispatch({ type: 'START', playerPile: cards.slice(0, 26), aiPile: cards.slice(26) })
     } catch {
       /* surfaced via deck.error */
@@ -44,7 +46,10 @@ export function Slapjack() {
   useEffect(() => {
     if (state.phase !== 'flipping' || state.turn !== 'ai') return
     flipTick.current += 1
-    const id = setTimeout(() => dispatch({ type: 'FLIP' }), rand(500, 950))
+    const id = setTimeout(() => {
+      feedback('flip')
+      dispatch({ type: 'FLIP' })
+    }, rand(500, 950))
     return () => clearTimeout(id)
   }, [state.phase, state.turn, state.center.length])
 
@@ -55,11 +60,19 @@ export function Slapjack() {
       return
     }
     slapOpenedAt.current = performance.now()
-    const id = setTimeout(() => dispatch({ type: 'SLAP', who: 'ai' }), rand(380, 900))
+    const id = setTimeout(() => {
+      feedback('slap')
+      dispatch({ type: 'SLAP', who: 'ai' })
+    }, rand(380, 900))
     return () => clearTimeout(id)
   }, [state.phase, state.center.length])
 
+  useEffect(() => {
+    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
+  }, [state.phase, state.winner])
+
   const slap = () => {
+    feedback('slap')
     if (state.phase === 'slap' && slapOpenedAt.current != null) {
       const ms = Math.round(performance.now() - slapOpenedAt.current)
       setBestMs((b) => (b == null ? ms : Math.min(b, ms)))
@@ -131,7 +144,16 @@ export function Slapjack() {
 
           {!over ? (
             <div className="flex w-full max-w-sm gap-3">
-              <Button size="lg" variant="ghost" className="flex-1" onClick={() => dispatch({ type: 'FLIP' })} disabled={!canFlip}>
+              <Button
+                size="lg"
+                variant="ghost"
+                className="flex-1"
+                onClick={() => {
+                  feedback('flip')
+                  dispatch({ type: 'FLIP' })
+                }}
+                disabled={!canFlip}
+              >
                 Flip
               </Button>
               <Button size="lg" variant="accent" className="flex-1" onClick={slap}>
