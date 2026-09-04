@@ -7,8 +7,12 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   test: {
+    // Pure-logic tests (`*.test.ts`) run in plain Node — no DOM needed, so they
+    // stay fast. Component/interaction tests (`*.test.tsx`) opt into jsdom
+    // individually via a `// @vitest-environment jsdom` docblock.
     environment: 'node',
     globals: true,
-    include: ['src/**/*.test.ts'],
+    setupFiles: ['src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 })
