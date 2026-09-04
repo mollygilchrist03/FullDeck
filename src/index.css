@@ -38,24 +38,30 @@
   }
 }
 
-html,
-body,
+html {
+  min-height: 100%;
+}
+
 #root {
-  height: 100%;
+  min-height: 100vh;
 }
 
 body {
   margin: 0;
+  min-height: 100vh;
   overflow-x: hidden; /* belt-and-braces against a stray wide child */
-  /* Felt photo (public/felt.jpg) scaled to fill the viewport, tinted a touch
-     darker so cream text keeps its contrast. Solid colour is the fallback. */
-  background-color: var(--color-felt-deep);
-  background-image:
+  /* Every layer is `background-attachment: fixed`, so the felt photo and the
+     overhead-light / darkened-corner vignette stay anchored to the viewport and
+     frame the screen no matter how tall the page is or how far it's scrolled.
+     Solid colour is the last-resort fallback. */
+  background:
+    radial-gradient(ellipse 130% 80% at 50% -12%, rgba(255, 255, 255, 0.07), transparent 62%),
+    radial-gradient(ellipse 140% 65% at 50% 112%, rgba(0, 0, 0, 0.45), transparent 62%),
+    radial-gradient(ellipse at 50% 45%, transparent 42%, rgba(0, 0, 0, 0.34) 100%),
     linear-gradient(rgba(10, 61, 45, 0.32), rgba(10, 61, 45, 0.52)),
-    url('/felt.png');
+    url('/felt.png') center / cover no-repeat,
+    var(--color-felt-deep);
   background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center;
   background-attachment: fixed;
   color: var(--color-card);
   font-family:
@@ -65,14 +71,6 @@ body {
     Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
-}
-
-/* Overhead light + darkened corners, layered over the felt photo */
-#root {
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.07), transparent 55%),
-    radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, 0.4), transparent 55%),
-    radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.28));
 }
 
 /* ---- Card 3D flip primitives ---- */
