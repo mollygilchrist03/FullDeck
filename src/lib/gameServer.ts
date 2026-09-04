@@ -13,6 +13,11 @@ import { warReducer, initWar } from '../games/war/warReducer.js'
 import { slapjackReducer, initSlapjack } from '../games/slapjack/slapjackReducer.js'
 import { oldMaidReducer, initOldMaid } from '../games/oldmaid/oldMaidReducer.js'
 import { removeOneQueen } from '../games/oldmaid/oldMaidLogic.js'
+import {
+  crazyEightsReducer,
+  initCrazyEights,
+  HAND_SIZE as CE_HAND,
+} from '../games/crazyeights/crazyEightsReducer.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyState = any
@@ -66,10 +71,43 @@ const oldMaid: GameServer = {
   isOver: (s) => s.phase === 'gameover',
 }
 
+const crazyEights: GameServer = {
+  deal: (c) => {
+    const playerHand = c.slice(0, CE_HAND)
+    const aiHand = c.slice(CE_HAND, CE_HAND * 2)
+    const rest = c.slice(CE_HAND * 2)
+    const starterIdx = Math.max(0, rest.findIndex((x) => x.rank !== '8'))
+    const discard = [rest[starterIdx]]
+    const stock = rest.filter((_, i) => i !== starterIdx)
+    return crazyEightsReducer(initCrazyEights(), {
+      type: 'START',
+      stock,
+      discard,
+      playerHand,
+      aiHand,
+      activeSuit: discard[0].suit,
+    })
+  },
+  reduce: crazyEightsReducer,
+  authorize: (s, seat, a) => {
+    if (s.phase === 'gameover') return false
+    const want = role(seat)
+    const side = a?.side ?? 'player'
+    if (side !== want) return false
+    if (a?.type === 'CHOOSE_SUIT') return s.phase === 'awaitSuit' && s.wildSide === want
+    if (a?.type === 'PLAY' || a?.type === 'DRAW' || a?.type === 'PASS') {
+      return s.phase === (want === 'player' ? 'playerTurn' : 'aiTurn')
+    }
+    return false
+  },
+  isOver: (s) => s.phase === 'gameover',
+}
+
 export const GAME_SERVERS: Partial<Record<MpGameKey, GameServer>> = {
   war,
   slapjack,
   'old-maid': oldMaid,
+  'crazy-eights': crazyEights,
 }
 
 /** Fetch a fresh shuffled 52-card deck (server-side). */

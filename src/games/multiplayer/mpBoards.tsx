@@ -5,6 +5,7 @@ import { WarBoard } from '../war/WarBoard'
 import type { WarState } from '../war/warReducer'
 import { SlapjackRoom } from './SlapjackRoom'
 import { OldMaidRoom } from './OldMaidRoom'
+import { CrazyEightsRoom } from './CrazyEightsRoom'
 
 export interface MpBoardProps {
   view: RoomView
@@ -47,6 +48,7 @@ const BOARDS: Partial<Record<MpGameKey, (p: MpBoardProps) => ReactNode>> = {
   war: War,
   slapjack: SlapjackRoom,
   'old-maid': OldMaidRoom,
+  'crazy-eights': CrazyEightsRoom,
 }
 
 export function MpBoard(props: MpBoardProps): ReactNode {
