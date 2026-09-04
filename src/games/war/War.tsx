@@ -5,6 +5,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
+import { feedback } from '../../lib/feedback'
 import { initWar, warReducer } from './warReducer'
 import { WarBoard } from './WarBoard'
 
@@ -20,6 +21,7 @@ export function War() {
     setDealing(true)
     try {
       const cards = await drawCards(52)
+      feedback('deal')
       dispatch({ type: 'START', playerPile: cards.slice(0, 26), dealerPile: cards.slice(26) })
     } catch {
       /* surfaced via deck.error */
@@ -35,6 +37,10 @@ export function War() {
   }, [newGame])
 
   const over = state.phase === 'gameover'
+
+  useEffect(() => {
+    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
+  }, [state.phase, state.winner])
 
   return (
     <Layout
@@ -63,7 +69,14 @@ export function War() {
         <Loading label="Splitting the deck…" />
       ) : (
         <div className="flex flex-col items-center gap-4">
-          <WarBoard state={state} mySeat={0} onFlip={() => dispatch({ type: 'FLIP' })} />
+          <WarBoard
+            state={state}
+            mySeat={0}
+            onFlip={() => {
+              feedback('flip')
+              dispatch({ type: 'FLIP' })
+            }}
+          />
           {over && (
             <div className="flex flex-col items-center gap-3">
               {state.winner === 'player' && <ScoreSubmit game="war" score={state.battles} />}
