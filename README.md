@@ -1,5 +1,7 @@
 # Full Deck
 
+[![CI](https://github.com/mollygilchrist03/FullDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/mollygilchrist03/FullDeck/actions/workflows/ci.yml)
+
 A small collection of classic card games built from scratch — the point isn't
 displaying card data, it's implementing the actual games: shuffling, dealing,
 hand scoring, dealer AI, win conditions, and the discrete state transitions each
