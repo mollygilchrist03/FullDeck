@@ -6,6 +6,7 @@ import { Loading, ErrorNotice } from '../../components/Loading'
 import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
+import { feedback } from '../../lib/feedback'
 import type { Rank } from '../../types/card'
 import { ranksIn } from './goFishLogic'
 import { goFishReducer, initGoFish } from './goFishReducer'
@@ -56,6 +57,7 @@ export function GoFish() {
     setDealing(true)
     try {
       const c = await drawCards(52)
+      feedback('deal')
       dispatch({ type: 'START', playerHand: c.slice(0, 7), aiHand: c.slice(7, 14), stock: c.slice(14) })
     } catch {
       /* surfaced via deck.error */
@@ -72,9 +74,16 @@ export function GoFish() {
 
   useEffect(() => {
     if (state.phase !== 'aiAsk' && state.phase !== 'aiDraw') return
-    const id = setTimeout(() => dispatch({ type: 'AI_STEP' }), AI_STEP_MS)
+    const id = setTimeout(() => {
+      feedback('flip')
+      dispatch({ type: 'AI_STEP' })
+    }, AI_STEP_MS)
     return () => clearTimeout(id)
   }, [state.phase, state.aiSteps])
+
+  useEffect(() => {
+    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
+  }, [state.phase, state.winner])
 
   const over = state.phase === 'gameover'
   const myRanks = ranksIn(state.playerHand).sort(
@@ -129,7 +138,10 @@ export function GoFish() {
           {/* The stock — click it to fish when you've missed. */}
           <button
             type="button"
-            onClick={() => dispatch({ type: 'DRAW' })}
+            onClick={() => {
+              feedback('flip')
+              dispatch({ type: 'DRAW' })
+            }}
             disabled={state.phase !== 'playerDraw'}
             className="flex flex-col items-center gap-1 disabled:opacity-60"
             aria-label="Draw from the stock"
@@ -163,7 +175,14 @@ export function GoFish() {
                     : 'Dealer is thinking…'}
               </p>
               {state.phase === 'playerDraw' ? (
-                <Button size="lg" variant="accent" onClick={() => dispatch({ type: 'DRAW' })}>
+                <Button
+                  size="lg"
+                  variant="accent"
+                  onClick={() => {
+                    feedback('flip')
+                    dispatch({ type: 'DRAW' })
+                  }}
+                >
                   🎣 Go fish
                 </Button>
               ) : (
@@ -172,7 +191,10 @@ export function GoFish() {
                     <Button
                       key={r}
                       variant="gold"
-                      onClick={() => dispatch({ type: 'ASK', rank: r })}
+                      onClick={() => {
+                        feedback('flip')
+                        dispatch({ type: 'ASK', rank: r })
+                      }}
                       disabled={state.phase !== 'playerAsk'}
                     >
                       {RANK_SHORT[r]}
