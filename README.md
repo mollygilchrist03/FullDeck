@@ -5,7 +5,7 @@
 A small collection of classic card games built from scratch — the point isn't
 displaying card data, it's implementing the actual games: shuffling, dealing,
 hand scoring, dealer AI, win conditions, and the discrete state transitions each
-game runs on. Ten games — Blackjack, Memory Match, War, High-Low, Video Poker,
+game runs on. Ten games — Blackjack, Memory Match, War, High-Low, Texas Hold'em,
 Crazy Eights, Slapjack, Go Fish, Trash, and Old Maid — share one foundation, and
 the interesting logic is factored into isolated pure functions with their own
 unit tests rather than tangled into components. Rules follow the Bicycle /
@@ -19,7 +19,7 @@ join-code room, not just against the built-in AI.
 
 ![Blackjack — a hand in progress with the dealer's hole card face-down and the chip stack](docs/screenshots/blackjack.png)
 
-![Video Poker — five cards dealt, two held, the Jacks-or-Better paytable below](docs/screenshots/video-poker.png)
+![Texas Hold'em — heads-up against the house, mid-hand with the flop on the board](docs/screenshots/holdem.png)
 
 ## What it does
 
@@ -45,10 +45,12 @@ shuffled back in so games terminate; the match ends when a player holds all 52.
 build a streak. Aces are high, equal ranks are a push. Best streak for the
 session is tracked.
 
-**Video Poker (Jacks or Better).** Bet 1–5 credits, get five cards, hold any of
-them, and draw replacements for the rest. The resulting five-card poker hand is
-evaluated and paid on a 9/6 schedule — right down to the max-bet royal-flush
-bonus.
+**Texas Hold'em.** Heads-up, no-limit, against the house. Two hole cards each,
+five community cards revealed in stages (flop, turn, river), and real betting —
+check, call, raise to any size, or shove all-in, with the uncalled part of an
+oversized shove returned if your opponent can't match it. Best five of your two
+plus the board wins the pot; the small blind acts first before the flop and
+last on every street after. Bust your stack and the match is over.
 
 **Crazy Eights.** Heads-up against an AI. Deal seven each; play a card matching
 the discard's suit or rank, or an eight (wild — you name the new suit). No legal
@@ -82,14 +84,18 @@ set it serves), with a CSS-drawn fallback if an image fails to load.
 
 **Leaderboard.** Each game reports one headline number to a shared, cross-visitor
 leaderboard in the top nav — peak bank (Blackjack), best 6×6 time (Memory),
-longest streak (High-Low), fewest battles (War), biggest single win (Video
-Poker), cards left on the AI (Crazy Eights), fastest slap (Slapjack), books
+longest streak (High-Low), fewest battles (War), peak stack in a won match
+(Hold'em), cards left on the AI (Crazy Eights), fastest slap (Slapjack), books
 collected (Go Fish), turns to the match win (Trash). Backed by a Neon Postgres
 table behind a Vercel serverless function, with an
 [`obscenity`](https://github.com/jo3-l/obscenity)-based name filter (leetspeak,
 spacing, and confusable-unicode aware, with a false-positive whitelist).
 Client-side pre-check, server-side authority; the app still runs with no database
-attached (the API answers 503 and the UI says so).
+attached (the API answers 503 and the UI says so). Submission is rate-limited
+per IP through a Postgres-backed log (not an in-memory map, which only holds
+within one warm serverless instance), gated by a honeypot field and an
+Origin check, and every game's score bounds are sized to what real play can
+actually produce, not round permissive numbers.
 
 **Multiplayer.** "👥 Friend" in the nav → host a room (a 6-character code from an
 unambiguous alphabet) or join one; two players, same link. The authoritative
@@ -97,10 +103,16 @@ game state is a `rooms` row; the *same reducers* run inside the serverless
 function, which validates that the acting seat owns the move before applying it.
 Clients stay live by long-polling — a `GET` that hangs server-side up to ~24s and
 returns the instant the room's `version` bumps. War, Slapjack, Old Maid, Crazy
-Eights, Go Fish, and Trash are all playable in a room (High-Low and Video Poker
+Eights, Go Fish, and Trash are all playable in a room (High-Low and Hold'em
 stay solo). Solo-vs-AI is untouched — the reducers were generalised so each move
 carries an optional `side`, the AI move-picker just dispatches side `'ai'`, and a
 human in that seat sends the same actions.
+
+**Sound and haptics.** Deal, flip, slap, win, and lose each get a short cue,
+synthesised on the fly with the Web Audio API — oscillator tones and filtered
+noise bursts with a gain envelope — so there are no audio files to source,
+license, or ship. A speaker icon in the nav toggles both sound and vibration
+(Android Chrome only) off together, persisted per-browser.
 
 ## Notable engineering decisions
 
@@ -129,14 +141,26 @@ and free of any React or network concerns.
   is ignored. A timed `RESOLVE` action clears the pair. Small detail, but it's
   the kind of state-management bug that's obvious once it bites.
 
-- **A reusable poker-hand evaluator**
-  ([`src/games/videopoker/pokerHand.ts`](src/games/videopoker/pokerHand.ts)).
-  `evaluateHand(cards)` reduces five cards to a category with an ordered set of
-  checks — flush and straight flags plus rank-multiplicity shape — handling both
-  the ace-high straight and the A-2-3-4-5 wheel, and distinguishing a low pair
-  from a paying pair of jacks. The paytable
-  ([`paytable.ts`](src/games/videopoker/paytable.ts)) is a separate lookup so
-  the scoring and the economics stay independent.
+- **A real 7-card hand evaluator with tiebreaks, not just a category**
+  ([`src/games/holdem/handRank.ts`](src/games/holdem/handRank.ts)).
+  Showdown has to compare the *best* 5-card hand out of 7 (2 hole + 5 board),
+  and two hands in the same category still need a real tiebreak — two flushes
+  compare on their cards, two full houses on trip rank then pair rank, and so
+  on. `bestHand` tries all 21 five-card combinations and keeps the best by
+  category tier then tiebreak, correctly handling the A-2-3-4-5 wheel (whose
+  "high card" for comparison is 5, not the ace).
+
+- **A genuine no-limit betting engine, not a fixed-bet-size toy**
+  ([`src/games/holdem/holdemReducer.ts`](src/games/holdem/holdemReducer.ts)).
+  Runs on bet-*to* semantics (an action names the total you'll have put in
+  this street, not an increment), which makes multi-raise streets and
+  all-in-for-less — the shortfall refunded to the shover as an uncalled bet —
+  fall out for free instead of needing special-case code. All 5 community
+  cards are dealt into state at the start of the hand and only *revealed* a
+  few at a time by phase, so running an all-in out to showdown is just
+  advancing phase — no mid-hand card draws, no async handshake with the
+  container. The AI (`holdemLogic.ts`) is a deterministic hand-strength-vs-
+  pot-odds policy, same shape as every other game's AI here.
 
 - **Blackjack is a multi-hand state machine**
   ([`src/games/blackjack/blackjackReducer.ts`](src/games/blackjack/blackjackReducer.ts)).
@@ -185,8 +209,9 @@ and free of any React or network concerns.
 
 - **The AI opponents are pure policies.** Crazy Eights (`chooseAiPlay`), Go Fish
   (`chooseAiAsk`, with a small memory of what you've asked for), Trash (fill the
-  lowest open slot), and Slapjack (a randomised reaction delay) — each decides in
-  a plain function the container steps on a timer so the moves are watchable.
+  lowest open slot), Slapjack (a randomised reaction delay), and Hold'em
+  (`chooseAiAction`, hand strength vs. pot odds) — each decides in a plain
+  function the container steps on a timer so the moves are watchable.
 
 - **`useDeck`** ([`src/hooks/useDeck.ts`](src/hooks/useDeck.ts)) caches the deck
   id for the session, auto-reshuffles when the deck runs low (repeated Blackjack
@@ -201,6 +226,22 @@ and free of any React or network concerns.
   `backface-hidden` faces and a `rotateY(180deg)` toggle — no layout shift, so it
   stays smooth on mobile.
 
+- **Every sound effect is synthesised, not shipped.**
+  [`src/lib/sound.ts`](src/lib/sound.ts) builds deal/flip/slap/win/lose from a
+  handful of Web Audio primitives — a short oscillator tone with a linear
+  attack and exponential decay for a "blip", or a burst of random noise
+  through a bandpass filter for a felt-table "tick" or a slap's snap. One
+  shared `AudioContext`, lazily created on first play (browsers block audio
+  before a user gesture anyway, which is exactly when these fire).
+
+- **A Postgres-backed rate limit, not an in-memory Map.**
+  [`api/scores.ts`](api/scores.ts) logs every submission attempt (valid or
+  not) to a `submission_log` table keyed on a salted-and-hashed IP — never the
+  raw address — so the 8-per-minute limit holds across every serverless
+  instance, not just the one that happens to be warm. A honeypot field and an
+  Origin check add two more cheap, no-dependency filters against the laziest
+  scripted abuse.
+
 - **One config module drives the leaderboard on both sides.**
   [`src/lib/leaderboard.ts`](src/lib/leaderboard.ts) — the game list, each
   metric's ranking direction, validation bounds, name sanitising, score
@@ -211,11 +252,16 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **180 unit tests** ([Vitest](https://vitest.dev/)) over scoring, dealer AI,
-  outcome settlement, board building, card comparison, high-low judging, poker
-  evaluation, payouts, blackjack split/double/insurance, war conservation, every
-  AI policy, the profanity filter, leaderboard validation/formatting, and every
-  reducer transition. They need no network and no DOM.
+- **217 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+  over scoring, dealer AI, outcome settlement, board building, card comparison,
+  high-low judging, Hold'em hand ranking and betting, every AI policy, the
+  profanity filter, leaderboard validation/formatting, and every reducer
+  transition — no network, no DOM, plain Node. A smaller set are React Testing
+  Library component tests (jsdom, opted into per-file so the logic tests stay
+  on the faster Node environment) covering the assembled UI's clicks, disabled
+  states, and phase transitions — Memory's match-lock, War's ready-barrier, and
+  the multiplayer boards' pending-request disabling — that a pure reducer test
+  can't reach.
 
 ## Tech stack
 
@@ -226,7 +272,7 @@ and free of any React or network concerns.
 | Styling | Tailwind CSS v4 (palette defined in `@theme`) |
 | Routing | React Router — `/`, ten game routes (code-split with `React.lazy`), `/leaderboard`, `/multiplayer`, `/room/:code` |
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
-| Tests | Vitest (pure-logic unit tests) |
+| Tests | Vitest — pure-logic unit tests (Node) + component/interaction tests (jsdom, React Testing Library) |
 | Card data | Deck of Cards API (free, no key) |
 | Leaderboard + rooms | Vercel serverless functions (`api/`) + Neon Postgres via Drizzle ORM; `obscenity` name filter; long-poll sync |
 | Hosting | Vercel (static SPA + functions) |
@@ -236,7 +282,7 @@ and free of any React or network concerns.
 ```bash
 npm install      # .npmrc pins legacy-peer-deps — npm 11 crashes on vitest's optional-peer graph
 npm run dev      # http://localhost:5173  (games work; /api is not served here)
-npm test         # game-logic + leaderboard unit tests (offline)
+npm test         # game-logic, leaderboard, and component tests (offline)
 npm run build    # tsc typecheck (app + api) + production build
 npm run lint
 ```
@@ -263,9 +309,11 @@ runs — the leaderboard and multiplayer just report that they aren't configured
 
 Things worth adding if this grew past a portfolio piece:
 
-- Heads-up Texas Hold'em — the poker evaluator already does most of the work.
-- Leaderboard hardening — a bot deterrent beyond the per-instance rate limit,
-  and server-side plausibility checks tighter than the current range bounds.
-- Component/interaction tests — the logic is covered, but the assembled UI
-  currently leans on `tsc`, `vite build`, and headless-Chromium screenshots.
-- Sound and haptics on deal / flip / win.
+- Personal accounts (Google sign-in and plain email/password) with a saved
+  history of games played and an opt-in toggle to auto-post scores to the
+  leaderboard under your account name instead of typing it in each time.
+- A CI-driven Lighthouse/bundle-size budget so the route-level code-splitting
+  doesn't quietly regress as games grow.
+- A proper NL min-raise rule (currently any raise above the current bet is
+  legal; real no-limit requires raising by at least the size of the previous
+  bet or raise) and side pots if this ever became more than heads-up.
