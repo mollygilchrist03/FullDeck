@@ -1,5 +1,5 @@
 import type { Card } from '../../types/card'
-import { rankValue } from '../../lib/rank'
+import { rankValue } from '../../lib/rank.js'
 
 export type Battle = 'player' | 'dealer' | 'war'
 

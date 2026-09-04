@@ -1,5 +1,5 @@
 import type { Card } from '../../types/card'
-import { compareCards, warBuryCount } from './warLogic'
+import { compareCards, warBuryCount } from './warLogic.js'
 
 export type WarPhase = 'idle' | 'ready' | 'war' | 'gameover'
 

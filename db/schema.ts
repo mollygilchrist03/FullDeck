@@ -1,4 +1,13 @@
-import { index, integer, pgTable, serial, timestamp, varchar } from 'drizzle-orm/pg-core'
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  varchar,
+} from 'drizzle-orm/pg-core'
 
 /**
  * One row per submitted score. `score` is always stored as-is; the ranking
@@ -19,3 +28,32 @@ export const scores = pgTable(
 
 export type ScoreRow = typeof scores.$inferSelect
 export type NewScore = typeof scores.$inferInsert
+
+/**
+ * One row per multiplayer room. `state` holds the game's reducer state (or null
+ * in the lobby); `seats` is a fixed-length array of seat holders. `version`
+ * increments on every mutation and drives long-poll updates.
+ */
+export const rooms = pgTable(
+  'rooms',
+  {
+    /** 6-char join code, unambiguous alphabet. */
+    code: varchar('code', { length: 6 }).primaryKey(),
+    game: varchar('game', { length: 32 }).notNull(),
+    /** 'lobby' | 'playing' | 'done' */
+    phase: varchar('phase', { length: 16 }).notNull().default('lobby'),
+    /** Array of { id, name } | null, one per seat. */
+    seats: jsonb('seats').notNull(),
+    /** Secret seat-holder id of the host (may start the game). */
+    hostId: text('host_id').notNull(),
+    /** The game reducer's state, or null before start. */
+    state: jsonb('state'),
+    version: integer('version').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('rooms_updated_idx').on(t.updatedAt)],
+)
+
+export type RoomRow = typeof rooms.$inferSelect
+export type NewRoom = typeof rooms.$inferInsert
