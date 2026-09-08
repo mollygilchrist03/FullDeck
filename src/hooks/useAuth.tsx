@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AccountUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [googleEnabled, setGoogleEnabled] = useState(false)
+  const [mailEnabled, setMailEnabled] = useState(false)
   const [configured, setConfigured] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -30,10 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = (await res.json()) as {
         user: AccountUser | null
         googleEnabled?: boolean
+        mailEnabled?: boolean
         configured?: boolean
       }
       setUser(data.user ?? null)
       setGoogleEnabled(Boolean(data.googleEnabled))
+      setMailEnabled(Boolean(data.mailEnabled))
       setConfigured(data.configured !== false)
     } catch {
       setUser(null)
@@ -64,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     googleEnabled,
+    mailEnabled,
     configured,
     register: (email, password, displayName) =>
       wrap(() => postJson('/api/auth/register', { email, password, displayName })),

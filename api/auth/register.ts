@@ -7,6 +7,7 @@ import { sanitizeName } from '../../src/lib/leaderboard.js'
 import { isCleanName } from '../../src/lib/profanity.js'
 import {
   clientIp,
+  createEmailToken,
   createSession,
   hashPassword,
   loginThrottled,
@@ -14,6 +15,9 @@ import {
   publicUser,
   sessionCookie,
 } from '../../server/auth.js'
+import { originOf, sendMail } from '../../server/mail.js'
+
+const VERIFY_TTL_MS = 24 * 3600_000
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!isDbConfigured) {
@@ -68,6 +72,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .insert(users)
       .values({ email, passwordHash: hashPassword(body.password as string), displayName })
       .returning()
+
+    // Fire off a verification email — best effort, never blocks signup.
+    try {
+      const vToken = await createEmailToken(db, row.id, 'verify', VERIFY_TTL_MS)
+      const link = `${originOf(req.headers)}/account/verify?token=${vToken}`
+      await sendMail(
+        email,
+        'Confirm your Full Deck email',
+        `Welcome to Full Deck.\n\nConfirm this address:\n${link}\n\nThe link is good for 24 hours. If you didn't sign up, ignore this.`,
+      )
+    } catch (mailErr) {
+      console.error('[api/auth/register] verification email failed', mailErr)
+    }
 
     const token = await createSession(db, row.id)
     res.setHeader('Set-Cookie', sessionCookie(token))

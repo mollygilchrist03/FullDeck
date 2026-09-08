@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const db = getDb()
     // 1) known Google account, 2) an existing email/password account to link,
-    // 3) brand new.
+    // 3) brand new. Google has already confirmed the address either way.
     let [row] = await db.select().from(users).where(eq(users.googleSub, identity.sub)).limit(1)
     if (!row) {
       const [byEmail] = await db
@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (byEmail) {
         ;[row] = await db
           .update(users)
-          .set({ googleSub: identity.sub })
+          .set({ googleSub: identity.sub, emailVerified: true })
           .where(eq(users.id, byEmail.id))
           .returning()
       }
@@ -72,6 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           email: identity.email,
           googleSub: identity.sub,
           displayName: nameFrom(identity.name, identity.email),
+          emailVerified: true,
         })
         .returning()
     }

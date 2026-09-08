@@ -7,7 +7,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { and, eq, gt, lt, sql } from 'drizzle-orm'
 import type { Db } from '../db/client.js'
-import { loginAttempts, sessions, users, type UserRow } from '../db/schema.js'
+import { emailTokens, loginAttempts, sessions, users, type UserRow } from '../db/schema.js'
 
 const SCRYPT_KEYLEN = 64
 export const SESSION_TTL_MS = 30 * 24 * 3600_000 // 30 days
@@ -23,6 +23,7 @@ export interface PublicUser {
   email: string
   displayName: string
   autoPost: boolean
+  emailVerified: boolean
   hasPassword: boolean
   hasGoogle: boolean
 }
@@ -33,6 +34,7 @@ export function publicUser(row: UserRow): PublicUser {
     email: row.email,
     displayName: row.displayName,
     autoPost: row.autoPost,
+    emailVerified: row.emailVerified,
     hasPassword: row.passwordHash != null,
     hasGoogle: row.googleSub != null,
   }
@@ -92,6 +94,46 @@ export async function destroySession(db: Db, cookieHeader: string | undefined): 
   const token = parseCookies(cookieHeader)[SESSION_COOKIE]
   if (!token) return
   await db.delete(sessions).where(eq(sessions.tokenHash, hashToken(token)))
+}
+
+/** Drop every session for a user — used after a password reset. */
+export async function destroyAllSessions(db: Db, userId: number): Promise<void> {
+  await db.delete(sessions).where(eq(sessions.userId, userId))
+}
+
+/* ---- one-time email tokens (verify / reset) ---- */
+
+export type EmailTokenKind = 'verify' | 'reset'
+
+export async function createEmailToken(
+  db: Db,
+  userId: number,
+  kind: EmailTokenKind,
+  ttlMs: number,
+): Promise<string> {
+  const token = randomBytes(32).toString('base64url')
+  await db.insert(emailTokens).values({
+    tokenHash: hashToken(token),
+    userId,
+    kind,
+    expiresAt: new Date(Date.now() + ttlMs),
+  })
+  return token
+}
+
+/** Validate a token, delete it (one-time use), and return its user id. */
+export async function consumeEmailToken(
+  db: Db,
+  token: string,
+  kind: EmailTokenKind,
+): Promise<number | null> {
+  const tokenHash = hashToken(token)
+  const [row] = await db
+    .delete(emailTokens)
+    .where(and(eq(emailTokens.tokenHash, tokenHash), eq(emailTokens.kind, kind)))
+    .returning({ userId: emailTokens.userId, expiresAt: emailTokens.expiresAt })
+  if (!row || row.expiresAt.getTime() < Date.now()) return null
+  return row.userId
 }
 
 export function sessionCookie(token: string): string {

@@ -97,6 +97,9 @@ export const users = pgTable(
     googleSub: varchar('google_sub', { length: 255 }),
     displayName: varchar('display_name', { length: 20 }).notNull(),
     autoPost: boolean('auto_post').notNull().default(false),
+    /** True once the address is confirmed via an emailed link. Informational —
+     * nothing is gated on it; the account works from the moment it's made. */
+    emailVerified: boolean('email_verified').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -127,6 +130,27 @@ export const sessions = pgTable(
 )
 
 export type SessionRow = typeof sessions.$inferSelect
+
+/**
+ * One-time tokens for email confirmation and password reset. Like sessions,
+ * only the SHA-256 of the token is stored; the row is deleted on use.
+ */
+export const emailTokens = pgTable(
+  'email_tokens',
+  {
+    tokenHash: varchar('token_hash', { length: 64 }).primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 'verify' | 'reset' */
+    kind: varchar('kind', { length: 16 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('email_tokens_user_idx').on(t.userId)],
+)
+
+export type EmailTokenRow = typeof emailTokens.$inferSelect
 
 /**
  * A finished game recorded against an account — the "saved games" history.

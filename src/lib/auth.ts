@@ -32,6 +32,7 @@ export interface AccountUser {
   email: string
   displayName: string
   autoPost: boolean
+  emailVerified: boolean
   hasPassword: boolean
   hasGoogle: boolean
 }

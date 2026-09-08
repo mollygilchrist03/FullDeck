@@ -51,9 +51,62 @@ function History() {
   )
 }
 
+function ForgotPassword({ onBack }: { onBack: () => void }) {
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const send = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/request-reset', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      if (!res.ok) throw new Error((data.error as string) ?? 'Something went wrong.')
+      setSent((data.message as string) ?? 'If that email has an account, a reset link is on its way.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto flex max-w-sm flex-col gap-4">
+      <p className="text-sm text-card/75">Enter your email and we’ll send a reset link.</p>
+      {sent ? (
+        <p className="text-sm text-card/80">{sent}</p>
+      ) : (
+        <>
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="rounded-lg border border-gold/40 bg-felt px-3 py-2 text-sm text-card focus:border-gold focus:outline-none"
+            onKeyDown={(e) => e.key === 'Enter' && void send()}
+          />
+          <Button variant="gold" onClick={() => void send()} disabled={busy}>
+            {busy ? <Spinner className="h-4 w-4" /> : 'Send reset link'}
+          </Button>
+          {error && <p className="text-sm text-casino">{error}</p>}
+        </>
+      )}
+      <button type="button" onClick={onBack} className="text-sm text-gold hover:underline">
+        Back to sign in
+      </button>
+    </div>
+  )
+}
+
 function SignedOut() {
   const { register, login, googleEnabled } = useAuth()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -64,6 +117,8 @@ function SignedOut() {
   useEffect(() => {
     if (params.get('error') === 'google') setError('Google sign-in didn’t complete. Try again.')
   }, [params])
+
+  if (mode === 'forgot') return <ForgotPassword onBack={() => setMode('login')} />
 
   const submit = async () => {
     setBusy(true)
@@ -140,6 +195,15 @@ function SignedOut() {
           {busy ? <Spinner className="h-4 w-4" /> : mode === 'register' ? 'Create account' : 'Sign in'}
         </Button>
         {error && <p className="text-sm text-casino">{error}</p>}
+        {mode === 'login' && (
+          <button
+            type="button"
+            onClick={() => setMode('forgot')}
+            className="self-start text-xs text-card/60 hover:text-gold hover:underline"
+          >
+            Forgot your password?
+          </button>
+        )}
       </div>
 
       {googleEnabled && (
@@ -161,8 +225,38 @@ function SignedOut() {
   )
 }
 
+function VerifyBanner() {
+  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const resend = async () => {
+    setState('sending')
+    await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    }).catch(() => {})
+    setState('sent')
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-gold/40 bg-gold/10 p-4 text-sm text-card/85">
+      <span>Your email isn’t confirmed yet — check your inbox for the link.</span>
+      {state === 'sent' ? (
+        <span className="text-card/60">Sent. Give it a minute.</span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void resend()}
+          disabled={state === 'sending'}
+          className="self-start font-semibold text-gold hover:underline disabled:opacity-50"
+        >
+          {state === 'sending' ? 'Sending…' : 'Resend confirmation email'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function SignedIn() {
-  const { user, updateAccount, logout } = useAuth()
+  const { user, mailEnabled, updateAccount, logout } = useAuth()
   const [name, setName] = useState(user?.displayName ?? '')
   const [savingName, setSavingName] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -186,6 +280,8 @@ function SignedIn() {
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
+      {mailEnabled && !user.emailVerified && <VerifyBanner />}
+
       <div className="rounded-xl border border-gold/30 bg-black/20 p-4">
         <p className="text-xs uppercase tracking-widest text-gold/80">Signed in as</p>
         <p className="text-card">{user.email}</p>

@@ -12,6 +12,8 @@ export interface AuthState {
   loading: boolean
   /** Whether the deployment has Google sign-in configured. */
   googleEnabled: boolean
+  /** Whether outgoing email (verify / reset links) is configured. */
+  mailEnabled: boolean
   /** Whether accounts are configured at all (database present). */
   configured: boolean
   register: (email: string, password: string, displayName: string) => Promise<AuthResult>

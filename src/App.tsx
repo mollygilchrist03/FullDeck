@@ -27,6 +27,12 @@ const Multiplayer = lazy(() =>
 )
 const Room = lazy(() => import('./games/multiplayer/Room').then((m) => ({ default: m.Room })))
 const Account = lazy(() => import('./games/account/Account').then((m) => ({ default: m.Account })))
+const VerifyEmail = lazy(() =>
+  import('./games/account/AuthLinks').then((m) => ({ default: m.VerifyEmail })),
+)
+const ResetPassword = lazy(() =>
+  import('./games/account/AuthLinks').then((m) => ({ default: m.ResetPassword })),
+)
 
 export function App() {
   return (
@@ -38,6 +44,8 @@ export function App() {
           <Route path="/multiplayer" element={<Multiplayer />} />
           <Route path="/room/:code" element={<Room />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/account/verify" element={<VerifyEmail />} />
+          <Route path="/account/reset" element={<ResetPassword />} />
           <Route path="/blackjack" element={<Blackjack />} />
           <Route path="/memory" element={<Memory />} />
           <Route path="/war" element={<War />} />
