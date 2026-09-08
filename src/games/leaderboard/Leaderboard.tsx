@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { useLeaderboard } from '../../hooks/useLeaderboard'
-import { formatScore, GAME_KEYS, GAMES, type GameKey } from '../../lib/leaderboard'
-import { timeAgo } from '../../lib/timeAgo'
+import { Layout } from '../../components/Layout.js'
+import { useLeaderboard } from '../../hooks/useLeaderboard.js'
+import { formatScore, GAME_KEYS, GAMES, type GameKey } from '../../lib/leaderboard.js'
+import { timeAgo } from '../../lib/timeAgo.js'
 
 function Board({ game }: { game: GameKey }) {
   const { entries, loading, error } = useLeaderboard(game, 10)

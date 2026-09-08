@@ -1,6 +1,6 @@
-import { Card } from '../../../components/Card'
-import type { GridSize } from '../memoryReducer'
-import type { Tile } from '../memoryLogic'
+import { Card } from '../../../components/Card.js'
+import type { GridSize } from '../memoryReducer.js'
+import type { Tile } from '../memoryLogic.js'
 
 interface GridProps {
   tiles: Tile[]

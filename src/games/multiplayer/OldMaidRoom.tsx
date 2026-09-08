@@ -1,6 +1,6 @@
-import { Card } from '../../components/Card'
-import type { OldMaidState } from '../oldmaid/oldMaidReducer'
-import type { MpBoardProps } from './mpBoards'
+import { Card } from '../../components/Card.js'
+import type { OldMaidState } from '../oldmaid/oldMaidReducer.js'
+import type { MpBoardProps } from './mpBoards.js'
 
 export function OldMaidRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as OldMaidState

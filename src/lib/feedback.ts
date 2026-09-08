@@ -1,5 +1,5 @@
-import { playSound, type SoundName } from './sound'
-import { vibrate, type HapticName } from './haptics'
+import { playSound, type SoundName } from './sound.js'
+import { vibrate, type HapticName } from './haptics.js'
 
 /** Fires a moment's sound and (where one exists) its matching haptic pattern.
  * The one call site every game reaches for — see sound.ts / haptics.ts for

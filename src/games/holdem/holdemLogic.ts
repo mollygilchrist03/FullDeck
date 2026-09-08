@@ -6,10 +6,10 @@
  * being offered, and folds / calls / value-bets accordingly. The tradeoff is
  * a human can eventually learn its exact thresholds, same as any other AI here.
  */
-import type { Card } from '../../types/card'
-import { rankValue } from '../../lib/rank'
-import { bestHand, type HandCategory } from './handRank'
-import { BIG_BLIND, revealedBoard, toCall, type HoldemState } from './holdemReducer'
+import type { Card } from '../../types/card.js'
+import { rankValue } from '../../lib/rank.js'
+import { bestHand, type HandCategory } from './handRank.js'
+import { BIG_BLIND, revealedBoard, toCall, type HoldemState } from './holdemReducer.js'
 
 export type AiDecision = { type: 'FOLD' } | { type: 'CHECK' } | { type: 'CALL' } | { type: 'BET'; to: number }
 

@@ -1,14 +1,14 @@
-import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
-import type { Suit } from '../../types/card'
-import { isPlayable } from '../crazyeights/crazyEightsLogic'
+import { Button } from '../../components/Button.js'
+import { Card } from '../../components/Card.js'
+import type { Suit } from '../../types/card.js'
+import { isPlayable } from '../crazyeights/crazyEightsLogic.js'
 import {
   canDraw,
   sideHasMove,
   topCard,
   type CrazyEightsState,
-} from '../crazyeights/crazyEightsReducer'
-import type { MpBoardProps } from './mpBoards'
+} from '../crazyeights/crazyEightsReducer.js'
+import type { MpBoardProps } from './mpBoards.js'
 
 const SUIT_GLYPH: Record<Suit, string> = { HEARTS: '♥', DIAMONDS: '♦', CLUBS: '♣', SPADES: '♠' }
 const SUITS: Suit[] = ['HEARTS', 'DIAMONDS', 'CLUBS', 'SPADES']

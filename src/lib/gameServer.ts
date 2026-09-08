@@ -5,7 +5,7 @@
  * `/api/rooms` serverless function — keep relative imports `.js`-suffixed and
  * free of React.
  */
-import type { Card } from '../types/card'
+import type { Card } from '../types/card.js'
 import { newDeck, draw } from '../api/deckClient.js'
 import type { MpGameKey } from './multiplayer.js'
 

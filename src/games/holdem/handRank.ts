@@ -5,8 +5,8 @@
  * cards (2 hole + 5 community), and two hands in the same category need a
  * real tiebreak, not just a label.
  */
-import type { Card } from '../../types/card'
-import { rankValue } from '../../lib/rank'
+import type { Card } from '../../types/card.js'
+import { rankValue } from '../../lib/rank.js'
 
 export type HandCategory =
   | 'straight-flush'

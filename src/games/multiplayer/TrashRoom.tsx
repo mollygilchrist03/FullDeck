@@ -1,7 +1,7 @@
-import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
-import type { Slot, TrashState } from '../trash/trashReducer'
-import type { MpBoardProps } from './mpBoards'
+import { Button } from '../../components/Button.js'
+import { Card } from '../../components/Card.js'
+import type { Slot, TrashState } from '../trash/trashReducer.js'
+import type { MpBoardProps } from './mpBoards.js'
 
 function Row({
   slots,

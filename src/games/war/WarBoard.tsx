@@ -1,6 +1,6 @@
-import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
-import type { WarState } from './warReducer'
+import { Button } from '../../components/Button.js'
+import { Card } from '../../components/Card.js'
+import type { WarState } from './warReducer.js'
 
 function Pile({ label, count }: { label: string; count: number }) {
   return (

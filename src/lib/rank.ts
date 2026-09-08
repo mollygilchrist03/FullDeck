@@ -1,4 +1,4 @@
-import type { Rank } from '../types/card'
+import type { Rank } from '../types/card.js'
 
 /** Ranks low → high, aces high. Index + 2 is the "natural" value (2..14). */
 export const RANK_ORDER: Rank[] = [

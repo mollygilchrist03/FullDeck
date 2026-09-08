@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Loading, ErrorNotice } from '../../components/Loading'
-import { useDeck } from '../../hooks/useDeck'
-import { buildBoard } from './memoryLogic'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { Loading, ErrorNotice } from '../../components/Loading.js'
+import { useDeck } from '../../hooks/useDeck.js'
+import { buildBoard } from './memoryLogic.js'
 import {
   initMemory,
   memoryReducer,
   PAIRS_FOR,
   type GridSize,
-} from './memoryReducer'
-import { Grid } from './components/Grid'
-import { Hud } from './components/Hud'
-import { DifficultySelector } from './components/DifficultySelector'
-import { CompletionScreen } from './components/CompletionScreen'
-import { ScoreSubmit } from '../../components/ScoreSubmit'
-import { GameRules } from '../../components/GameRules'
-import { feedback } from '../../lib/feedback'
-import { useRecordGameOnce } from '../../hooks/useRecordGame'
+} from './memoryReducer.js'
+import { Grid } from './components/Grid.js'
+import { Hud } from './components/Hud.js'
+import { DifficultySelector } from './components/DifficultySelector.js'
+import { CompletionScreen } from './components/CompletionScreen.js'
+import { ScoreSubmit } from '../../components/ScoreSubmit.js'
+import { GameRules } from '../../components/GameRules.js'
+import { feedback } from '../../lib/feedback.js'
+import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
 
 const MISMATCH_DELAY = 900
 const PULSE_DELAY = 600

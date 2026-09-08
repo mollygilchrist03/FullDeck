@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
-import { ScoreSubmit } from '../../components/ScoreSubmit'
-import type { MpGameKey, RoomView } from '../../lib/multiplayer'
-import { WarBoard } from '../war/WarBoard'
-import type { WarState } from '../war/warReducer'
-import { SlapjackRoom } from './SlapjackRoom'
-import { OldMaidRoom } from './OldMaidRoom'
-import { CrazyEightsRoom } from './CrazyEightsRoom'
-import { GoFishRoom } from './GoFishRoom'
-import { TrashRoom } from './TrashRoom'
+import { ScoreSubmit } from '../../components/ScoreSubmit.js'
+import type { MpGameKey, RoomView } from '../../lib/multiplayer.js'
+import { WarBoard } from '../war/WarBoard.js'
+import type { WarState } from '../war/warReducer.js'
+import { SlapjackRoom } from './SlapjackRoom.js'
+import { OldMaidRoom } from './OldMaidRoom.js'
+import { CrazyEightsRoom } from './CrazyEightsRoom.js'
+import { GoFishRoom } from './GoFishRoom.js'
+import { TrashRoom } from './TrashRoom.js'
 
 export interface MpBoardProps {
   view: RoomView

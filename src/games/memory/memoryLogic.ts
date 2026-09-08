@@ -1,4 +1,4 @@
-import type { Card } from '../../types/card'
+import type { Card } from '../../types/card.js'
 
 export interface Tile {
   /** Unique per tile (both halves of a pair differ here). */

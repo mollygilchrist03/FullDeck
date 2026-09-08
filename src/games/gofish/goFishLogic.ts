@@ -1,4 +1,4 @@
-import type { Card, Rank } from '../../types/card'
+import type { Card, Rank } from '../../types/card.js'
 
 /** Pull every completed set of four from a hand. Returns the trimmed hand + book ranks. */
 export function takeBooks(hand: Card[]): { hand: Card[]; books: Rank[] } {

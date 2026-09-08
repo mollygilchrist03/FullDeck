@@ -1,4 +1,4 @@
-import { isMatch, isWin, type Tile } from './memoryLogic'
+import { isMatch, isWin, type Tile } from './memoryLogic.js'
 
 export type GridSize = 4 | 6
 export type MemoryStatus = 'idle' | 'playing' | 'won'

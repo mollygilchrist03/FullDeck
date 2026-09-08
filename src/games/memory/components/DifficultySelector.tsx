@@ -1,5 +1,5 @@
-import type { GridSize } from '../memoryReducer'
-import { PAIRS_FOR } from '../memoryReducer'
+import type { GridSize } from '../memoryReducer.js'
+import { PAIRS_FOR } from '../memoryReducer.js'
 
 interface DifficultySelectorProps {
   value: GridSize

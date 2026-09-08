@@ -1,4 +1,4 @@
-import type { Card, Rank } from '../../types/card'
+import type { Card, Rank } from '../../types/card.js'
 
 export interface HandScore {
   /** Best total that does not bust, if one exists; otherwise the minimum total. */

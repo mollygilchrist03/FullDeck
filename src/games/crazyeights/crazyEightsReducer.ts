@@ -1,4 +1,4 @@
-import type { Card, Suit } from '../../types/card'
+import type { Card, Suit } from '../../types/card.js'
 import { shuffle } from '../../lib/shuffle.js'
 import { chooseAiPlay, isPlayable, playableCards } from './crazyEightsLogic.js'
 

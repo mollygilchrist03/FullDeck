@@ -1,5 +1,5 @@
-import { Button } from '../../../components/Button'
-import { CHIP_DENOMINATIONS } from '../blackjackReducer'
+import { Button } from '../../../components/Button.js'
+import { CHIP_DENOMINATIONS } from '../blackjackReducer.js'
 
 interface BetControlsProps {
   bank: number

@@ -1,4 +1,4 @@
-import type { GameKey } from './leaderboard'
+import type { GameKey } from './leaderboard.js'
 
 /** Games that support a two-player online room. */
 export const MP_GAMES = [

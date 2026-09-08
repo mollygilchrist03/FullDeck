@@ -1,5 +1,5 @@
-import type { Card } from '../../types/card'
-import { isBlackjack, scoreHand } from './handScoring'
+import type { Card } from '../../types/card.js'
+import { isBlackjack, scoreHand } from './handScoring.js'
 
 export type Outcome = 'blackjack' | 'win' | 'push' | 'loss'
 

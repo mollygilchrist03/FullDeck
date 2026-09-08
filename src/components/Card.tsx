@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Card as CardData, Suit } from '../types/card'
+import type { Card as CardData, Suit } from '../types/card.js'
 
 interface CardProps {
   card?: CardData

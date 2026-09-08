@@ -1,4 +1,4 @@
-import type { Card } from '../../types/card'
+import type { Card } from '../../types/card.js'
 
 export type SlapjackPhase = 'flipping' | 'slap' | 'gameover'
 

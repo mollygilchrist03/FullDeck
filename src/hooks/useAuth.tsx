@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import type { AccountUser } from '../lib/auth'
-import { AuthContext, type AuthResult, type AuthState } from './authContext'
+import type { AccountUser } from '../lib/auth.js'
+import { AuthContext, type AuthResult, type AuthState } from './authContext.js'
 
 async function postJson(url: string, body?: unknown) {
   const res = await fetch(url, {

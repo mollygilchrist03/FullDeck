@@ -1,8 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { Hub } from './games/hub/Hub'
-import { Loading } from './components/Loading'
-import { AuthProvider } from './hooks/useAuth'
+import { Hub } from './games/hub/Hub.js'
+import { Loading } from './components/Loading.js'
+import { AuthProvider } from './hooks/useAuth.js'
 
 // Route-level code splitting: the hub (the very first thing anyone sees) loads
 // eagerly, every game and the multiplayer/leaderboard screens load on demand

@@ -1,4 +1,4 @@
-import type { Card } from '../../types/card'
+import type { Card } from '../../types/card.js'
 import { compareCards, warBuryCount } from './warLogic.js'
 
 export type WarPhase = 'idle' | 'ready' | 'war' | 'gameover'

@@ -1,4 +1,4 @@
-import type { ApiCard, Card, DrawResult, Rank, Suit } from '../types/card'
+import type { ApiCard, Card, DrawResult, Rank, Suit } from '../types/card.js'
 
 const BASE = 'https://deckofcardsapi.com/api/deck'
 

@@ -10,8 +10,8 @@
  * showdown is just advancing phase with no further card draws needed, and
  * the reducer never has to ask the container for cards mid-hand.
  */
-import type { Card } from '../../types/card'
-import { bestHand, compareHandRank, type HandRank } from './handRank'
+import type { Card } from '../../types/card.js'
+import { bestHand, compareHandRank, type HandRank } from './handRank.js'
 
 export type HoldemPhase = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown' | 'handover'
 export type Side = 'player' | 'ai'

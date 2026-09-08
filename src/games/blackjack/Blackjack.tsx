@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Loading, ErrorNotice } from '../../components/Loading'
-import { useDeck } from '../../hooks/useDeck'
-import { ScoreSubmit } from '../../components/ScoreSubmit'
-import { GameRules } from '../../components/GameRules'
-import { feedback } from '../../lib/feedback'
-import { useRecordGameOnce } from '../../hooks/useRecordGame'
-import type { Card as CardData } from '../../types/card'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { Loading, ErrorNotice } from '../../components/Loading.js'
+import { useDeck } from '../../hooks/useDeck.js'
+import { ScoreSubmit } from '../../components/ScoreSubmit.js'
+import { GameRules } from '../../components/GameRules.js'
+import { feedback } from '../../lib/feedback.js'
+import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
+import type { Card as CardData } from '../../types/card.js'
 import {
   blackjackReducer,
   canDouble,
@@ -15,12 +15,12 @@ import {
   committed,
   initBlackjack,
   STARTING_BANK,
-} from './blackjackReducer'
-import { dealerShouldHit } from './dealerAI'
-import { OUTCOME_MESSAGE } from './outcome'
-import { Hand } from './components/Hand'
-import { ChipStack } from './components/ChipStack'
-import { BetControls } from './components/BetControls'
+} from './blackjackReducer.js'
+import { dealerShouldHit } from './dealerAI.js'
+import { OUTCOME_MESSAGE } from './outcome.js'
+import { Hand } from './components/Hand.js'
+import { ChipStack } from './components/ChipStack.js'
+import { BetControls } from './components/BetControls.js'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 

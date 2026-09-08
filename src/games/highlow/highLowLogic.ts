@@ -1,5 +1,5 @@
-import type { Card } from '../../types/card'
-import { RANK_ORDER, rankValue } from '../../lib/rank'
+import type { Card } from '../../types/card.js'
+import { RANK_ORDER, rankValue } from '../../lib/rank.js'
 
 export type Guess = 'higher' | 'lower'
 export type Judgement = 'correct' | 'wrong' | 'push'

@@ -1,4 +1,4 @@
-import type { Card, Suit } from '../../types/card'
+import type { Card, Suit } from '../../types/card.js'
 
 export const SUITS: Suit[] = ['HEARTS', 'DIAMONDS', 'CLUBS', 'SPADES']
 

@@ -1,5 +1,5 @@
-import type { Card } from '../../types/card'
-import { scoreHand } from './handScoring'
+import type { Card } from '../../types/card.js'
+import { scoreHand } from './handScoring.js'
 
 /**
  * Standard dealer rule: draw until the hand totals 17 or more, then stand —

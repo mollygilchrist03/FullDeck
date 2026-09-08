@@ -1,5 +1,5 @@
-import { Button } from '../../../components/Button'
-import { formatTime } from '../format'
+import { Button } from '../../../components/Button.js'
+import { formatTime } from '../format.js'
 
 interface CompletionScreenProps {
   moves: number

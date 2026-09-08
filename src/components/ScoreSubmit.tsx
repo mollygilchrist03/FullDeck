@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button } from './Button'
-import { Spinner } from './Loading'
-import { submitScore } from '../hooks/useLeaderboard'
-import { useAuth } from '../hooks/authContext'
-import { formatScore, GAMES, NAME_MAX, type GameKey } from '../lib/leaderboard'
-import { isCleanName } from '../lib/profanity'
+import { Button } from './Button.js'
+import { Spinner } from './Loading.js'
+import { submitScore } from '../hooks/useLeaderboard.js'
+import { useAuth } from '../hooks/authContext.js'
+import { formatScore, GAMES, NAME_MAX, type GameKey } from '../lib/leaderboard.js'
+import { isCleanName } from '../lib/profanity.js'
 
 const NAME_STORAGE_KEY = 'fulldeck:name'
 

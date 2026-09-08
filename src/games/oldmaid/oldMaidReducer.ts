@@ -1,4 +1,4 @@
-import type { Card, Rank } from '../../types/card'
+import type { Card, Rank } from '../../types/card.js'
 import { discardPairs } from './oldMaidLogic.js'
 
 export type OldMaidPhase = 'playerTurn' | 'aiTurn' | 'gameover'

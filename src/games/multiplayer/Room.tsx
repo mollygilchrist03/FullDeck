@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Loading } from '../../components/Loading'
-import { GAMES } from '../../lib/leaderboard'
-import { normalizeCode } from '../../lib/multiplayer'
-import { joinRoom, loadSeatId, useRoom } from '../../hooks/useRoom'
-import { MpBoard } from './mpBoards'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { Loading } from '../../components/Loading.js'
+import { GAMES } from '../../lib/leaderboard.js'
+import { normalizeCode } from '../../lib/multiplayer.js'
+import { joinRoom, loadSeatId, useRoom } from '../../hooks/useRoom.js'
+import { MpBoard } from './mpBoards.js'
 
 function ShareLine({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)

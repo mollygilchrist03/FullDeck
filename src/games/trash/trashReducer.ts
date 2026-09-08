@@ -1,4 +1,4 @@
-import type { Card } from '../../types/card'
+import type { Card } from '../../types/card.js'
 import { firstOpenSlot, isLayoutComplete, placementFor } from './trashLogic.js'
 
 export const START_SIZE = 10

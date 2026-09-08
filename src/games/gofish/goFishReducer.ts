@@ -1,4 +1,4 @@
-import type { Card, Rank } from '../../types/card'
+import type { Card, Rank } from '../../types/card.js'
 import { chooseAiAsk, countRank, takeBooks } from './goFishLogic.js'
 
 export type Side = 'player' | 'ai'

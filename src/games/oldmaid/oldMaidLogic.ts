@@ -1,4 +1,4 @@
-import type { Card, Rank } from '../../types/card'
+import type { Card, Rank } from '../../types/card.js'
 
 /** Drop one Queen so a single Queen is left unpairable — the Old Maid. */
 export function removeOneQueen(deck: Card[]): Card[] {

@@ -1,4 +1,4 @@
-import { isMuted } from './soundSettings'
+import { isMuted } from './soundSettings.js'
 
 export type HapticName = 'flip' | 'slap' | 'win' | 'lose'
 

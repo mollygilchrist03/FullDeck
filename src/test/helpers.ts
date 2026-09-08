@@ -1,4 +1,4 @@
-import type { Card, Rank, Suit } from '../types/card'
+import type { Card, Rank, Suit } from '../types/card.js'
 
 const SUIT_CODE: Record<Suit, string> = {
   HEARTS: 'H',

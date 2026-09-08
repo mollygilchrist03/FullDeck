@@ -1,7 +1,7 @@
-import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
-import { centerTop, isJack, type SlapjackState } from '../slapjack/slapjackReducer'
-import type { MpBoardProps } from './mpBoards'
+import { Button } from '../../components/Button.js'
+import { Card } from '../../components/Card.js'
+import { centerTop, isJack, type SlapjackState } from '../slapjack/slapjackReducer.js'
+import type { MpBoardProps } from './mpBoards.js'
 
 export function SlapjackRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as SlapjackState

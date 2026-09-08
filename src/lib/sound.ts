@@ -3,7 +3,7 @@
  * files to source, license, or ship. A handful of oscillator/noise voices
  * with a short gain envelope is enough for felt-table-sized sound cues.
  */
-import { isMuted } from './soundSettings'
+import { isMuted } from './soundSettings.js'
 
 export type SoundName = 'deal' | 'flip' | 'slap' | 'win' | 'lose'
 

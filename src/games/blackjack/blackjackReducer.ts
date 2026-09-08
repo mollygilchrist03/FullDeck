@@ -1,6 +1,6 @@
-import type { Card } from '../../types/card'
-import { isBlackjack, isBust, scoreHand } from './handScoring'
-import { PAYOUT_MULTIPLIER, settle, type Outcome } from './outcome'
+import type { Card } from '../../types/card.js'
+import { isBlackjack, isBust, scoreHand } from './handScoring.js'
+import { PAYOUT_MULTIPLIER, settle, type Outcome } from './outcome.js'
 
 export const STARTING_BANK = 100
 export const CHIP_DENOMINATIONS = [5, 25, 100] as const

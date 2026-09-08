@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
-import { Loading, ErrorNotice } from '../../components/Loading'
-import { useDeck } from '../../hooks/useDeck'
-import { ScoreSubmit } from '../../components/ScoreSubmit'
-import { GameRules } from '../../components/GameRules'
-import { feedback } from '../../lib/feedback'
-import { useRecordGameOnce } from '../../hooks/useRecordGame'
-import type { Suit } from '../../types/card'
-import { isPlayable, SUITS } from './crazyEightsLogic'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { Card } from '../../components/Card.js'
+import { Loading, ErrorNotice } from '../../components/Loading.js'
+import { useDeck } from '../../hooks/useDeck.js'
+import { ScoreSubmit } from '../../components/ScoreSubmit.js'
+import { GameRules } from '../../components/GameRules.js'
+import { feedback } from '../../lib/feedback.js'
+import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
+import type { Suit } from '../../types/card.js'
+import { isPlayable, SUITS } from './crazyEightsLogic.js'
 import {
   canDraw,
   crazyEightsReducer,
@@ -17,7 +17,7 @@ import {
   initCrazyEights,
   playerHasMove,
   topCard,
-} from './crazyEightsReducer'
+} from './crazyEightsReducer.js'
 
 const SUIT_GLYPH: Record<Suit, string> = {
   HEARTS: '♥',

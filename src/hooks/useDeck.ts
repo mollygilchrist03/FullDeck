@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import * as deckApi from '../api/deckClient'
-import type { Card } from '../types/card'
+import * as deckApi from '../api/deckClient.js'
+import type { Card } from '../types/card.js'
 
 interface UseDeck {
   /** Current deck id, or null before the first draw / `startNewDeck`. */

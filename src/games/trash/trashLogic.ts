@@ -1,4 +1,4 @@
-import type { Card } from '../../types/card'
+import type { Card } from '../../types/card.js'
 
 const POSITION: Record<string, number> = {
   ACE: 0,

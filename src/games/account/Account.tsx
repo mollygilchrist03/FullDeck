@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Loading, Spinner } from '../../components/Loading'
-import { useAuth } from '../../hooks/authContext'
-import { GAMES, NAME_MAX, isGameKey } from '../../lib/leaderboard'
-import { PASSWORD_MIN } from '../../lib/auth'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { Loading, Spinner } from '../../components/Loading.js'
+import { useAuth } from '../../hooks/authContext.js'
+import { GAMES, NAME_MAX, isGameKey } from '../../lib/leaderboard.js'
+import { PASSWORD_MIN } from '../../lib/auth.js'
 
 interface HistoryRow {
   game: string

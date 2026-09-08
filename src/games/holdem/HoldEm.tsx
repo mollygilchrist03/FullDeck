@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
-import { Loading, ErrorNotice } from '../../components/Loading'
-import { useDeck } from '../../hooks/useDeck'
-import { ScoreSubmit } from '../../components/ScoreSubmit'
-import { GameRules } from '../../components/GameRules'
-import { feedback } from '../../lib/feedback'
-import { useRecordGameOnce } from '../../hooks/useRecordGame'
-import type { Card as CardData } from '../../types/card'
-import { CATEGORY_LABEL } from './handRank'
-import { chooseAiAction } from './holdemLogic'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { Card } from '../../components/Card.js'
+import { Loading, ErrorNotice } from '../../components/Loading.js'
+import { useDeck } from '../../hooks/useDeck.js'
+import { ScoreSubmit } from '../../components/ScoreSubmit.js'
+import { GameRules } from '../../components/GameRules.js'
+import { feedback } from '../../lib/feedback.js'
+import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
+import type { Card as CardData } from '../../types/card.js'
+import { CATEGORY_LABEL } from './handRank.js'
+import { chooseAiAction } from './holdemLogic.js'
 import {
   BIG_BLIND,
   holdemReducer,
@@ -18,7 +18,7 @@ import {
   maxBetTo,
   revealedBoard,
   toCall,
-} from './holdemReducer'
+} from './holdemReducer.js'
 
 const AI_THINK_MS = 950
 

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { AccountUser } from '../lib/auth'
+import type { AccountUser } from '../lib/auth.js'
 
 export interface AuthResult {
   ok: boolean

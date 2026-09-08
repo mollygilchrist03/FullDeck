@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { GameKey } from '../lib/leaderboard'
+import type { GameKey } from '../lib/leaderboard.js'
 
 export interface LeaderEntry {
   name: string

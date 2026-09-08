@@ -1,9 +1,9 @@
-import { Button } from '../../components/Button'
-import { Card } from '../../components/Card'
-import type { Rank } from '../../types/card'
-import { ranksIn } from '../gofish/goFishLogic'
-import type { GoFishState } from '../gofish/goFishReducer'
-import type { MpBoardProps } from './mpBoards'
+import { Button } from '../../components/Button.js'
+import { Card } from '../../components/Card.js'
+import type { Rank } from '../../types/card.js'
+import { ranksIn } from '../gofish/goFishLogic.js'
+import type { GoFishState } from '../gofish/goFishReducer.js'
+import type { MpBoardProps } from './mpBoards.js'
 
 const RANK_SHORT: Record<Rank, string> = {
   ACE: 'A',

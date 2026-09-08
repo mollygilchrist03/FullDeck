@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Spinner } from '../../components/Loading'
-import { useAuth } from '../../hooks/authContext'
-import { PASSWORD_MIN, passwordProblem } from '../../lib/auth'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { Spinner } from '../../components/Loading.js'
+import { useAuth } from '../../hooks/authContext.js'
+import { PASSWORD_MIN, passwordProblem } from '../../lib/auth.js'
 
 async function post(url: string, body: unknown) {
   const res = await fetch(url, {

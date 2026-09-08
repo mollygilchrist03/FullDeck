@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { GAMES } from '../../lib/leaderboard'
-import { MP_GAMES, normalizeCode, type MpGameKey } from '../../lib/multiplayer'
-import { createRoom, joinRoom } from '../../hooks/useRoom'
+import { Layout } from '../../components/Layout.js'
+import { Button } from '../../components/Button.js'
+import { GAMES } from '../../lib/leaderboard.js'
+import { MP_GAMES, normalizeCode, type MpGameKey } from '../../lib/multiplayer.js'
+import { createRoom, joinRoom } from '../../hooks/useRoom.js'
 
 const NAME_KEY = 'fulldeck:name'
 const loadName = () => {

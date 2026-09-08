@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { MpGameKey, RoomView } from '../lib/multiplayer'
+import type { MpGameKey, RoomView } from '../lib/multiplayer.js'
 
 const seatKey = (code: string) => `fulldeck:room:${code}`
 

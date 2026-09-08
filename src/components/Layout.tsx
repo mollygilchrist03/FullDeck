@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { useMuted } from '../hooks/useMuted'
-import { toggleMuted } from '../lib/soundSettings'
-import { useAuth } from '../hooks/authContext'
-import { Icon } from './Icon'
+import { useMuted } from '../hooks/useMuted.js'
+import { toggleMuted } from '../lib/soundSettings.js'
+import { useAuth } from '../hooks/authContext.js'
+import { Icon } from './Icon.js'
 
 const NAV_LINK =
   'inline-flex items-center gap-1.5 rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5'

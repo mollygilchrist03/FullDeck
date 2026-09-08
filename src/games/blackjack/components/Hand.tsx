@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import { Card } from '../../../components/Card'
-import type { Card as CardData } from '../../../types/card'
-import { scoreHand } from '../handScoring'
+import { Card } from '../../../components/Card.js'
+import type { Card as CardData } from '../../../types/card.js'
+import { scoreHand } from '../handScoring.js'
 
 interface HandProps {
   label: string

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { useAuth } from './authContext'
-import type { GameKey } from '../lib/leaderboard'
+import { useAuth } from './authContext.js'
+import type { GameKey } from '../lib/leaderboard.js'
 
 /**
  * Save a finished game to the signed-in account's history — exactly once per

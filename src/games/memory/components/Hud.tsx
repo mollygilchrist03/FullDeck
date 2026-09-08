@@ -1,4 +1,4 @@
-import { formatTime } from '../format'
+import { formatTime } from '../format.js'
 
 interface HudProps {
   moves: number

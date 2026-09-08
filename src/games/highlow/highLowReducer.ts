@@ -1,5 +1,5 @@
-import type { Card } from '../../types/card'
-import { judge, type Guess, type Judgement } from './highLowLogic'
+import type { Card } from '../../types/card.js'
+import { judge, type Guess, type Judgement } from './highLowLogic.js'
 
 export type HighLowPhase = 'idle' | 'guessing' | 'revealed' | 'gameover' | 'won'
 
