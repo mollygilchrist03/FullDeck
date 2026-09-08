@@ -55,16 +55,20 @@ export function Slapjack() {
   }, [state.phase, state.turn, state.center.length])
 
   // A Jack is showing: open the reaction window and schedule the dealer's slap.
+  // ~600-1400ms is a real human-beatable reaction; one round in five the
+  // dealer "hesitates" and is a beat or two slower, so an alert player
+  // reliably takes those. It always slaps eventually, so the game can't stall.
   useEffect(() => {
     if (state.phase !== 'slap') {
       slapOpenedAt.current = null
       return
     }
     slapOpenedAt.current = performance.now()
+    const delay = rand(600, 1400) + (Math.random() < 0.2 ? rand(1400, 3000) : 0)
     const id = setTimeout(() => {
       feedback('slap')
       dispatch({ type: 'SLAP', who: 'ai' })
-    }, rand(380, 900))
+    }, delay)
     return () => clearTimeout(id)
   }, [state.phase, state.center.length])
 
