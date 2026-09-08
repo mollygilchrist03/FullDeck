@@ -109,6 +109,39 @@ describe('betting mechanics', () => {
     const attempted = holdemReducer(s, { type: 'CHECK', side: 'ai' }) // it's the button's turn
     expect(attempted).toBe(s) // untouched — illegal action is a no-op
   })
+
+  it('enforces the no-limit min-raise (a short raise is bumped up)', () => {
+    // Preflop: BB is 10, so the smallest legal raise is to 20.
+    let s = start()
+    s = holdemReducer(s, { type: 'BET', side: 'player', to: 12 }) // asks for a too-small raise
+    expect(s.playerBet).toBe(20) // bumped to the minimum
+    expect(s.lastRaise).toBe(10)
+
+    // Player raised to 20 (increment 10). A re-raise must add at least 10 more.
+    s = holdemReducer(s, { type: 'BET', side: 'ai', to: 25 }) // still short
+    expect(s.aiBet).toBe(30) // 20 + the 10 min increment
+    expect(s.lastRaise).toBe(10)
+
+    // Now the last raise increment is bigger — make it 40 total (increment 10
+    // over 30 is the min again; go to 60 for a clear full raise, increment 30).
+    s = holdemReducer(s, { type: 'BET', side: 'player', to: 60 })
+    expect(s.playerBet).toBe(60)
+    expect(s.lastRaise).toBe(30)
+    // Min re-raise is now 60 + 30 = 90.
+    s = holdemReducer(s, { type: 'BET', side: 'ai', to: 61 })
+    expect(s.aiBet).toBe(90)
+  })
+
+  it('allows a short all-in that raises by less than a full increment', () => {
+    // House can cover the bet but not a full min-raise on top.
+    let s = start()
+    s = holdemReducer(s, { type: 'BET', side: 'player', to: 20 }) // SB min-raises to 20
+    s = { ...s, aiStack: 12 } // house: aiBet 10 + 12 stack -> can go to 22 total
+    s = holdemReducer(s, { type: 'BET', side: 'ai', to: 999 }) // shove
+    expect(s.aiStack).toBe(0)
+    expect(s.aiBet).toBe(22) // a legal short all-in raise (increment 7 < the min 10)
+    expect(s.lastRaise).toBe(10) // a short all-in doesn't raise the bar
+  })
 })
 
 describe('all-in handling', () => {

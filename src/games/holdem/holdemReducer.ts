@@ -43,6 +43,9 @@ export interface HoldemState {
   pot: number
   playerBet: number
   aiBet: number
+  /** Size of the last full bet/raise this street — the minimum a re-raise must
+   * add on top of the current bet (a short all-in is the only exception). */
+  lastRaise: number
   actedPlayer: boolean
   actedAi: boolean
   playerFolded: boolean
@@ -110,6 +113,7 @@ export function initHoldem(): HoldemState {
     pot: 0,
     playerBet: 0,
     aiBet: 0,
+    lastRaise: BIG_BLIND,
     actedPlayer: false,
     actedAi: false,
     playerFolded: false,
@@ -145,6 +149,7 @@ function dealHand(
     pot: 0,
     playerBet: 0,
     aiBet: 0,
+    lastRaise: BIG_BLIND, // preflop, the min raise is to 2x the big blind
     actedPlayer: false,
     actedAi: false,
     playerFolded: false,
@@ -183,6 +188,7 @@ function advanceStreet(s: HoldemState): HoldemState {
     pot: potNow,
     playerBet: 0,
     aiBet: 0,
+    lastRaise: BIG_BLIND, // postflop the min *bet* is one big blind
     actedPlayer: s.playerStack === 0,
     actedAi: s.aiStack === 0,
   }
@@ -292,23 +298,36 @@ function call(s: HoldemState, side: Side): HoldemState {
 }
 
 function bet(s: HoldemState, side: Side, to: number): HoldemState {
-  const cap = maxBetTo(s, side)
+  const cap = maxBetTo(s, side) // this side's all-in total
   const opp = other(side)
+  const highBet = betOf(s, opp)
   // Can't even call, let alone raise — that's an all-in-for-less CALL, not a BET.
-  if (cap <= betOf(s, opp)) return s
-  const clamped = Math.max(betOf(s, opp) + 1, Math.min(to, cap))
-  if (clamped <= betOf(s, side)) return s // not a real raise
-  const delta = clamped - betOf(s, side)
+  if (cap <= highBet) return s
+  if (to <= highBet) return s // not attempting to raise at all — use CALL
+
+  // No-limit min-raise: a raise must add at least the size of the previous
+  // bet/raise on top of the current bet (`lastRaise`); the min *bet* on an
+  // unbet street is one big blind. A requested amount below that is bumped up
+  // — except a shove that is itself short, which is allowed all-in.
+  const minRaiseTo = highBet + s.lastRaise
+  const target = Math.min(cap, Math.max(to, minRaiseTo))
+
+  if (target <= betOf(s, side)) return s
+  const delta = target - betOf(s, side)
   let next = setStack(s, side, stackOf(s, side) - delta)
-  next = setBet(next, side, clamped)
+  next = setBet(next, side, target)
   next = setActed(next, side, true)
-  next = setActed(next, opp, false) // a new bet reopens the action
-  const isRaise = betOf(s, opp) > 0
+  next = setActed(next, opp, false) // a raise reopens the action
+  const increment = target - highBet
+  // A full raise raises the bar for the next re-raise; a short all-in doesn't.
+  const lastRaise = increment >= s.lastRaise ? increment : s.lastRaise
+  const isRaise = highBet > 0
   const word = side === 'player' ? (isRaise ? 'raise to' : 'bet') : isRaise ? 'raises to' : 'bets'
   return {
     ...next,
+    lastRaise,
     toAct: opp,
-    log: push(next.log, `${side === 'player' ? 'You' : 'The house'} ${word} ${clamped}.`),
+    log: push(next.log, `${side === 'player' ? 'You' : 'The house'} ${word} ${target}.`),
   }
 }
 
