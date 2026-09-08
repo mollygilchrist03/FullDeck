@@ -48,6 +48,39 @@ describe('goFishReducer', () => {
     expect(s.playerHand).toHaveLength(1)
   })
 
+  it("the AI only remembers the player's last two asks, not every rank forever", () => {
+    // Player holds one each of 3, 5, 9 — ask for all three in turn (each a
+    // miss followed by a draw so the turn comes back).
+    let s = seed({
+      playerHand: hand('3', '5', '9'),
+      aiHand: hand('KING'),
+      stock: hand('2', '4', '6', '8', '10'),
+    })
+    for (const rank of ['3', '5', '9'] as const) {
+      s = goFishReducer(s, { type: 'ASK', rank })
+      s = goFishReducer(s, { type: 'DRAW' }) // go fish, turn passes to AI
+      s = goFishReducer(s, { type: 'AI_STEP' }) // AI asks (has only a KING → miss)
+      s = goFishReducer(s, { type: 'AI_STEP' }) // AI draws, turn back to player
+    }
+    // The 3 (asked first, three turns ago) has fallen out of memory.
+    expect(s.knownPlayerRanks).not.toContain('3')
+    expect(s.knownPlayerRanks.length).toBeLessThanOrEqual(2)
+  })
+
+  it('the AI drops a remembered rank once it asks for it', () => {
+    const s = goFishReducer(
+      seed({
+        playerHand: hand('7', '2'),
+        aiHand: hand('7', 'KING'),
+        stock: hand('4', '5'),
+        phase: 'aiAsk',
+        knownPlayerRanks: ['7'],
+      }),
+      { type: 'AI_STEP' }, // AI asks for the remembered 7 (a hit)
+    )
+    expect(s.knownPlayerRanks).not.toContain('7')
+  })
+
   it('a hit transfers every matching card and keeps the turn', () => {
     const s = goFishReducer(seed(), { type: 'ASK', rank: '3' })
     expect(s.playerHand.filter((c) => c.rank === '3')).toHaveLength(3)

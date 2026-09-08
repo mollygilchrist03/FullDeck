@@ -13,7 +13,12 @@ export interface GoFishState {
   phase: GoFishPhase
   /** During a *Draw phase: the rank that side asked for (null for a draw-up). */
   pendingRank: Rank | null
-  /** Ranks the player has asked for — the AI's memory. */
+  /**
+   * The AI's memory: ranks the player has *asked* for (public information —
+   * you can only ask for a rank you hold). Never anything the player drew from
+   * the stock; that stays secret. Capped to the last couple of asks in
+   * `doAsk`, and an entry is dropped once the AI has asked for it.
+   */
   knownPlayerRanks: Rank[]
   /** Increments each AI_STEP so the container can keep stepping. */
   aiSteps: number
@@ -121,14 +126,21 @@ function drawFor(state: GoFishState, side: Side): { state: GoFishState; drawn: C
   return { state: withHand({ ...state, stock }, side, [...handOf(state, side), drawn]), drawn }
 }
 
+/** How many recent player asks the AI keeps in mind. A real opponent
+ * remembers the last thing or two you asked for, not every rank forever. */
+const AI_MEMORY = 2
+
 function doAsk(state: GoFishState, asker: Side, rank: Rank): GoFishState {
   if (state.phase !== askPhase(asker)) return state
   if (countRank(handOf(state, asker), rank) === 0) return state
   const opp = other(asker)
+  // The player asking reveals they hold `rank` — remember it, but only the
+  // last couple of asks. The AI asking *for* a remembered rank spends that
+  // read (it either cleaned you out or the info is now stale), so drop it.
   const known =
-    asker === 'player' && !state.knownPlayerRanks.includes(rank)
-      ? [...state.knownPlayerRanks, rank]
-      : state.knownPlayerRanks
+    asker === 'player'
+      ? [...state.knownPlayerRanks.filter((r) => r !== rank), rank].slice(-AI_MEMORY)
+      : state.knownPlayerRanks.filter((r) => r !== rank)
   const turnsTaken = asker === 'player' ? state.turnsTaken + 1 : state.turnsTaken
   const taken = handOf(state, opp).filter((c) => c.rank === rank)
 
@@ -158,15 +170,18 @@ function doDraw(state: GoFishState, drawer: Side): GoFishState {
 
   const { state: drawnState, drawn } = drawFor(state, drawer)
   const matched = state.pendingRank != null && drawn?.rank === state.pendingRank
-  const s = bookAndCheck({
-    ...drawnState,
-    log: push(
-      drawnState.log,
-      matched
-        ? `${name(drawer)} fished the ${RANK_LABEL[state.pendingRank!].replace(/s$/, '')} — go again!`
-        : `${name(drawer)} fished a ${RANK_LABEL[drawn!.rank].replace(/s$/, '')}.`,
-    ),
-  })
+  // Only name a card the other player would legitimately see: your own draw,
+  // or a matched draw (the rank was already public from the ask). A regular
+  // miss by the dealer stays hidden — otherwise the log would hand you its
+  // whole hand.
+  const line = matched
+    ? drawer === 'player'
+      ? `You fished the ${RANK_LABEL[state.pendingRank!].replace(/s$/, '')} — go again!`
+      : 'The dealer fished what it asked for — go again.'
+    : drawer === 'player'
+      ? `You fished a ${RANK_LABEL[drawn!.rank].replace(/s$/, '')}.`
+      : 'The dealer draws a card.'
+  const s = bookAndCheck({ ...drawnState, log: push(drawnState.log, line) })
   if (s.phase === 'gameover') return s
 
   if (state.pendingRank != null) {
