@@ -279,7 +279,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **231 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **237 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
   profanity filter, auth input rules, leaderboard validation/formatting, and
