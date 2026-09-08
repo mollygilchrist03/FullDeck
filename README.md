@@ -114,6 +114,17 @@ noise bursts with a gain envelope — so there are no audio files to source,
 license, or ship. A speaker icon in the nav toggles both sound and vibration
 (Android Chrome only) off together, persisted per-browser.
 
+**Accounts.** Optional — "👤 Sign in" in the nav. Email/password or Google
+(a hand-rolled OAuth 2.0 code flow with PKCE, run server-side). Signed in,
+every finished game is saved to your history, and finished games can post to
+the leaderboard under your account name — automatically if you flip the
+auto-post switch, otherwise one click with the name pre-filled. Auth is
+hand-rolled on the same Postgres: scrypt password hashing with a per-user
+salt and a timing-safe compare, session tokens that live in an HttpOnly
+cookie but are stored only as their SHA-256, and a cross-instance login
+throttle. Nothing about accounts is required — with no database, or without
+the Google client vars, those paths just report they aren't configured.
+
 ## Notable engineering decisions
 
 The parts worth reading are the pure functions — each is isolated, unit-tested,
@@ -242,6 +253,20 @@ and free of any React or network concerns.
   Origin check add two more cheap, no-dependency filters against the laziest
   scripted abuse.
 
+- **Hand-rolled auth on the same database** ([`server/auth.ts`](server/auth.ts),
+  [`server/google.ts`](server/google.ts)). No auth SaaS: passwords are scrypt
+  (`node:crypto`) with a 16-byte per-user salt and a `timingSafeEqual`
+  compare; a session is 32 random bytes in an `HttpOnly; Secure;
+  SameSite=Lax` cookie, but the row stores only its SHA-256 so a database
+  leak doesn't hand over live logins; brute-force is throttled through the
+  same salted-IP-hash table pattern as the score limiter. Google sign-in is
+  the OAuth 2.0 authorization-code flow with PKCE, done by hand — `/start`
+  stashes a verifier + state in a short-lived cookie and 302s to Google,
+  `/callback` checks state and reads the `id_token` straight from Google's
+  token endpoint (TLS + our client secret already establish its provenance),
+  then finds-or-links-or-creates the user. Every state-changing endpoint also
+  runs the mismatched-`Origin` check.
+
 - **One config module drives the leaderboard on both sides.**
   [`src/lib/leaderboard.ts`](src/lib/leaderboard.ts) — the game list, each
   metric's ranking direction, validation bounds, name sanitising, score
@@ -252,16 +277,16 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **217 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **222 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
-  profanity filter, leaderboard validation/formatting, and every reducer
-  transition — no network, no DOM, plain Node. A smaller set are React Testing
-  Library component tests (jsdom, opted into per-file so the logic tests stay
-  on the faster Node environment) covering the assembled UI's clicks, disabled
-  states, and phase transitions — Memory's match-lock, War's ready-barrier, and
-  the multiplayer boards' pending-request disabling — that a pure reducer test
-  can't reach.
+  profanity filter, auth input rules, leaderboard validation/formatting, and
+  every reducer transition — no network, no DOM, plain Node. A smaller set are
+  React Testing Library component tests (jsdom, opted into per-file so the
+  logic tests stay on the faster Node environment) covering the assembled UI's
+  clicks, disabled states, and phase transitions — Memory's match-lock, War's
+  ready-barrier, and the multiplayer boards' pending-request disabling — that a
+  pure reducer test can't reach.
 
 ## Tech stack
 
@@ -274,7 +299,8 @@ and free of any React or network concerns.
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest — pure-logic unit tests (Node) + component/interaction tests (jsdom, React Testing Library) |
 | Card data | Deck of Cards API (free, no key) |
-| Leaderboard + rooms | Vercel serverless functions (`api/`) + Neon Postgres via Drizzle ORM; `obscenity` name filter; long-poll sync |
+| Leaderboard / rooms / accounts | Vercel serverless functions (`api/`) + Neon Postgres via Drizzle ORM; `obscenity` name filter; long-poll sync |
+| Auth | Hand-rolled — `node:crypto` scrypt + hashed session cookies; Google OAuth 2.0 code flow + PKCE by hand |
 | Hosting | Vercel (static SPA + functions) |
 
 ## Local setup
@@ -282,7 +308,7 @@ and free of any React or network concerns.
 ```bash
 npm install      # .npmrc pins legacy-peer-deps — npm 11 crashes on vitest's optional-peer graph
 npm run dev      # http://localhost:5173  (games work; /api is not served here)
-npm test         # game-logic, leaderboard, and component tests (offline)
+npm test         # logic, leaderboard, auth-rules, and component tests (offline)
 npm run build    # tsc typecheck (app + api) + production build
 npm run lint
 ```
@@ -300,18 +326,27 @@ path to `index.html` so the client router handles the routes on a hard refresh.
 The repo is connected to Vercel, so a push to `master` is a production deploy.
 
 **Database.** The live demo is wired to a Neon Postgres store (created from the
-Vercel project's **Storage** tab, which sets `DATABASE_URL`); `npm run db:push`
-created the `scores` and `rooms` tables. To run your own, do the same and set
-`DATABASE_URL` for all environments. Until that's done the site still deploys and
-runs — the leaderboard and multiplayer just report that they aren't configured.
+Vercel project's **Storage** tab, which sets `DATABASE_URL`); the tables —
+`scores`, `submission_log`, `rooms`, `users`, `sessions`, `game_results`,
+`login_attempts` — come from [`db/schema.ts`](db/schema.ts) via `npm run
+db:push`. To run your own, do the same and set `DATABASE_URL` for all
+environments. Until that's done the site still deploys and runs — the
+leaderboard, multiplayer, and accounts just report that they aren't configured.
+
+**Google sign-in** is optional on top of that: create an OAuth 2.0 Web
+Application client in the Google Cloud console, register
+`https://<your-deployment>/api/auth/google/callback` as an authorized
+redirect URI, and set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in the
+Vercel env (see [`.env.example`](.env.example)). Without them, email/password
+still works and the Google button just doesn't render.
 
 ## What's next
 
 Things worth adding if this grew past a portfolio piece:
 
-- Personal accounts (Google sign-in and plain email/password) with a saved
-  history of games played and an opt-in toggle to auto-post scores to the
-  leaderboard under your account name instead of typing it in each time.
+- Email verification and password reset (both need a mail provider, so the
+  current accounts are usable the moment they're created and there's no
+  recovery flow).
 - A CI-driven Lighthouse/bundle-size budget so the route-level code-splitting
   doesn't quietly regress as games grow.
 - A proper NL min-raise rule (currently any raise above the current bet is
