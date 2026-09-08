@@ -29,18 +29,30 @@ const RANK_SHORT: Record<Rank, string> = {
 }
 const AI_STEP_MS = 950
 
-function Books({ label, books }: { label: string; books: Rank[] }) {
+function Books({ label, books, mine }: { label: string; books: Rank[]; mine?: boolean }) {
   return (
-    <div className="text-center">
-      <p className="text-xs uppercase tracking-widest text-gold/80">
-        {label} — {books.length}
+    <div
+      className={`rounded-lg border bg-felt-deep/60 px-3 py-2 ${
+        mine ? 'border-gold' : 'border-gold/40'
+      }`}
+    >
+      <p className="flex items-center justify-between gap-2 text-xs uppercase tracking-widest text-gold/80">
+        <span>{label}</span>
+        <span className="rounded bg-gold px-1.5 font-bold text-felt-deep">{books.length}</span>
       </p>
-      <div className="mt-1 flex flex-wrap justify-center gap-1">
-        {books.map((r) => (
-          <span key={r} className="rounded bg-gold/20 px-1.5 py-0.5 text-xs font-bold text-gold">
-            {RANK_SHORT[r]}
-          </span>
-        ))}
+      <div className="mt-1.5 flex min-h-7 flex-wrap gap-1">
+        {books.length === 0 ? (
+          <span className="text-xs text-card/40">None yet</span>
+        ) : (
+          books.map((r) => (
+            <span
+              key={r}
+              className="min-w-7 rounded bg-gold px-1.5 py-1 text-center text-sm font-bold text-felt-deep"
+            >
+              {RANK_SHORT[r]}
+            </span>
+          ))
+        )}
       </div>
     </div>
   )
@@ -138,9 +150,9 @@ export function GoFish() {
             </div>
           </div>
 
-          <div className="flex w-full max-w-md justify-around">
+          <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
+            <Books label="Your books" books={state.playerBooks} mine />
             <Books label="Dealer books" books={state.aiBooks} />
-            <Books label="Your books" books={state.playerBooks} />
           </div>
 
           {/* The stock — click it to fish when you've missed. */}
