@@ -90,4 +90,42 @@ describe('chooseAiAction', () => {
     })
     expect(chooseAiAction(s)).toEqual({ type: 'CALL' })
   })
+
+  it('value-bets top pair when checked to (not a pure nit)', () => {
+    const s = baseState({
+      aiHole: [card('ACE', 'HEARTS'), card('KING', 'CLUBS')], // top pair of aces
+      board: [card('ACE', 'SPADES'), card('7', 'CLUBS'), card('2', 'DIAMONDS'), card('4', 'HEARTS'), card('9', 'SPADES')],
+      phase: 'river',
+      playerBet: 0,
+      aiBet: 0,
+      pot: 30,
+    })
+    expect(chooseAiAction(s).type).toBe('BET')
+  })
+
+  it('calls a half-pot bet with top pair instead of folding it', () => {
+    const s = baseState({
+      aiHole: [card('ACE', 'HEARTS'), card('KING', 'CLUBS')],
+      board: [card('ACE', 'SPADES'), card('7', 'CLUBS'), card('2', 'DIAMONDS'), card('4', 'HEARTS'), card('9', 'SPADES')],
+      phase: 'river',
+      playerBet: 20, // half of the 40 pot
+      aiBet: 0,
+      aiStack: 200,
+      pot: 40,
+    })
+    expect(chooseAiAction(s)).toEqual({ type: 'CALL' })
+  })
+
+  it('raises a set facing a bet', () => {
+    const s = baseState({
+      aiHole: [card('9', 'HEARTS'), card('9', 'CLUBS')],
+      board: [card('9', 'SPADES'), card('KING', 'CLUBS'), card('4', 'DIAMONDS'), card('2', 'HEARTS'), card('7', 'SPADES')],
+      phase: 'river',
+      playerBet: 20,
+      aiBet: 0,
+      aiStack: 200,
+      pot: 40,
+    })
+    expect(chooseAiAction(s).type).toBe('BET') // a raise
+  })
 })
