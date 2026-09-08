@@ -7,6 +7,7 @@ import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import type { Suit } from '../../types/card'
 import { isPlayable, SUITS } from './crazyEightsLogic'
 import {
@@ -82,6 +83,19 @@ export function CrazyEights() {
   useEffect(() => {
     if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
   }, [state.phase, state.winner])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'gameover',
+    game: 'crazy-eights',
+    score: state.winner === 'player' && !state.stalemate ? state.aiHand.length : 0,
+    detail: state.stalemate
+      ? state.winner === 'player'
+        ? 'Won on a deadlock'
+        : 'Lost on a deadlock'
+      : state.winner === 'player'
+        ? `Won — ${state.aiHand.length} left on the AI`
+        : 'Lost',
+  })
 
   const top = state.discard.length ? topCard(state) : null
   const myTurn = state.phase === 'playerTurn'

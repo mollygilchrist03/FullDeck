@@ -17,6 +17,7 @@ import { CompletionScreen } from './components/CompletionScreen'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 
 const MISMATCH_DELAY = 900
 const PULSE_DELAY = 600
@@ -75,6 +76,13 @@ export function Memory() {
   useEffect(() => {
     if (state.status === 'won') feedback('win')
   }, [state.status])
+
+  useRecordGameOnce({
+    terminal: state.status === 'won',
+    game: 'memory',
+    score: Math.max(1, Math.round(elapsedMs / 1000)),
+    detail: `${state.gridSize}×${state.gridSize} in ${state.moves} moves, ${Math.round(elapsedMs / 1000)}s`,
+  })
 
   // Running timer while playing.
   useEffect(() => {

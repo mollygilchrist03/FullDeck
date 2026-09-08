@@ -6,6 +6,7 @@ import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import { initWar, warReducer } from './warReducer'
 import { WarBoard } from './WarBoard'
 
@@ -41,6 +42,16 @@ export function War() {
   useEffect(() => {
     if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
   }, [state.phase, state.winner])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'gameover',
+    game: 'war',
+    score: state.battles,
+    detail:
+      state.winner === 'player'
+        ? `Won in ${state.battles} battles`
+        : `Lost after ${state.battles} battles`,
+  })
 
   return (
     <Layout

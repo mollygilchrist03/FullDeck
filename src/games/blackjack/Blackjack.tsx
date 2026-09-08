@@ -6,6 +6,7 @@ import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import type { Card as CardData } from '../../types/card'
 import {
   blackjackReducer,
@@ -40,6 +41,18 @@ export function Blackjack() {
     if (state.netPayout > 0) feedback('win')
     else if (state.netPayout < 0) feedback('lose')
   }, [state.phase, state.netPayout])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'settled',
+    game: 'blackjack',
+    score: state.bank,
+    detail:
+      state.netPayout > 0
+        ? `Won +$${state.netPayout} (bank $${state.bank})`
+        : state.netPayout < 0
+          ? `Lost -$${-state.netPayout} (bank $${state.bank})`
+          : `Push (bank $${state.bank})`,
+  })
 
   const { startNewDeck, drawCards } = deck
 

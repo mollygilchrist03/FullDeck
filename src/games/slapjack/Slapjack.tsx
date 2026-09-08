@@ -7,6 +7,7 @@ import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import { centerTop, initSlapjack, isJack, slapjackReducer } from './slapjackReducer'
 
 const rand = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo))
@@ -70,6 +71,18 @@ export function Slapjack() {
   useEffect(() => {
     if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
   }, [state.phase, state.winner])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'gameover',
+    game: 'slapjack',
+    score: state.winner === 'player' && bestMs != null ? bestMs : 0,
+    detail:
+      state.winner === 'player'
+        ? bestMs != null
+          ? `Won — fastest slap ${bestMs}ms`
+          : 'Won'
+        : 'Lost',
+  })
 
   const slap = () => {
     feedback('slap')

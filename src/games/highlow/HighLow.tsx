@@ -7,6 +7,7 @@ import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import { highLowReducer, initHighLow } from './highLowReducer'
 
 const JUDGEMENT_TEXT = {
@@ -51,6 +52,16 @@ export function HighLow() {
     if (state.phase === 'won') feedback('win')
     else if (state.phase === 'gameover') feedback('lose')
   }, [state.phase])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'won' || state.phase === 'gameover',
+    game: 'high-low',
+    score: Math.max(best, state.streak),
+    detail:
+      state.phase === 'won'
+        ? 'Cleared the deck'
+        : `Run ended at ${state.streak} (best ${Math.max(best, state.streak)})`,
+  })
 
   const guess = useCallback(
     async (dir: 'higher' | 'lower') => {

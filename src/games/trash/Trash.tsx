@@ -7,6 +7,7 @@ import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import { initTrash, trashReducer, type Slot } from './trashReducer'
 
 const AI_STEP_MS = 850
@@ -94,6 +95,16 @@ export function Trash() {
   useEffect(() => {
     if (state.phase === 'gameover') feedback(state.matchWinner === 'player' ? 'win' : 'lose')
   }, [state.phase, state.matchWinner])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'gameover',
+    game: 'trash',
+    score: state.playerTurns,
+    detail:
+      state.matchWinner === 'player'
+        ? `Won the match in ${state.playerTurns} turns`
+        : 'Lost the match',
+  })
 
   const nextRound = () => {
     const pN = state.roundWinner === 'player' ? state.playerSize - 1 : state.playerSize

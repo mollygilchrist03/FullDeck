@@ -4,8 +4,52 @@ import { Layout } from '../../components/Layout'
 import { Button } from '../../components/Button'
 import { Loading } from '../../components/Loading'
 import { useAuth } from '../../hooks/authContext'
-import { NAME_MAX } from '../../lib/leaderboard'
+import { GAMES, NAME_MAX, isGameKey } from '../../lib/leaderboard'
 import { PASSWORD_MIN } from '../../lib/auth'
+
+interface HistoryRow {
+  game: string
+  score: number
+  detail: string | null
+  postedToLeaderboard: boolean
+  createdAt: string
+}
+
+function History() {
+  const [rows, setRows] = useState<HistoryRow[] | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/history')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { results: HistoryRow[] }) => setRows(d.results))
+      .catch(() => setError(true))
+  }, [])
+
+  if (error) return <p className="text-sm text-card/50">Couldn’t load your history.</p>
+  if (!rows) return <p className="text-sm text-card/50">Loading your games…</p>
+  if (rows.length === 0)
+    return <p className="text-sm text-card/60">No games saved yet — finish one and it’ll show up here.</p>
+
+  return (
+    <ul className="flex flex-col divide-y divide-gold/15 rounded-xl border border-gold/20 bg-black/20">
+      {rows.map((r, i) => (
+        <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+          <div className="min-w-0">
+            <p className="font-semibold text-card">
+              {isGameKey(r.game) ? GAMES[r.game].title : r.game}
+              {r.postedToLeaderboard && <span className="ml-2 text-xs text-gold">· on the board</span>}
+            </p>
+            {r.detail && <p className="truncate text-card/60">{r.detail}</p>}
+          </div>
+          <time className="shrink-0 text-xs text-card/40" dateTime={r.createdAt}>
+            {new Date(r.createdAt).toLocaleDateString()}
+          </time>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 function SignedOut() {
   const { register, login, googleEnabled } = useAuth()
@@ -184,6 +228,11 @@ function SignedIn() {
       </label>
 
       {msg && <p className="text-sm text-card/70">{msg}</p>}
+
+      <div className="flex flex-col gap-2">
+        <p className="text-xs uppercase tracking-widest text-gold/80">Recent games</p>
+        <History />
+      </div>
 
       <Button variant="ghost" onClick={() => void logout()}>
         Sign out

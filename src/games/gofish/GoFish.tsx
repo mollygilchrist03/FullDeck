@@ -7,6 +7,7 @@ import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import type { Rank } from '../../types/card'
 import { ranksIn } from './goFishLogic'
 import { goFishReducer, initGoFish } from './goFishReducer'
@@ -84,6 +85,13 @@ export function GoFish() {
   useEffect(() => {
     if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
   }, [state.phase, state.winner])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'gameover',
+    game: 'go-fish',
+    score: state.playerBooks.length,
+    detail: `${state.winner === 'player' ? 'Won' : 'Lost'} ${state.playerBooks.length}–${state.aiBooks.length}`,
+  })
 
   const over = state.phase === 'gameover'
   const myRanks = ranksIn(state.playerHand).sort(

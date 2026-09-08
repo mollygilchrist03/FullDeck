@@ -7,6 +7,7 @@ import { useDeck } from '../../hooks/useDeck'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import type { Card as CardData } from '../../types/card'
 import { CATEGORY_LABEL } from './handRank'
 import { chooseAiAction } from './holdemLogic'
@@ -69,6 +70,16 @@ export function HoldEm() {
       feedback(state.winner === 'player' ? 'win' : state.winner === 'split' ? 'flip' : 'lose')
     }
   }, [state.phase, state.winner])
+
+  useRecordGameOnce({
+    terminal: state.matchWinner != null,
+    game: 'holdem',
+    score: peakStack,
+    detail:
+      state.matchWinner === 'player'
+        ? `Won the match — peak stack $${peakStack}`
+        : 'Lost the match',
+  })
 
   // Drive the AI's turn.
   useEffect(() => {

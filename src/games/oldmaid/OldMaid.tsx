@@ -7,6 +7,7 @@ import { GameRules } from '../../components/GameRules'
 import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { useDeck } from '../../hooks/useDeck'
 import { feedback } from '../../lib/feedback'
+import { useRecordGameOnce } from '../../hooks/useRecordGame'
 import { removeOneQueen } from './oldMaidLogic'
 import { initOldMaid, oldMaidReducer } from './oldMaidReducer'
 
@@ -52,6 +53,16 @@ export function OldMaid() {
   useEffect(() => {
     if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
   }, [state.phase, state.winner])
+
+  useRecordGameOnce({
+    terminal: state.phase === 'gameover',
+    game: 'old-maid',
+    score: state.winner === 'player' ? state.turnsTaken : 0,
+    detail:
+      state.winner === 'player'
+        ? `Won in ${state.turnsTaken} draws`
+        : 'Lost — held the Old Maid',
+  })
 
   const over = state.phase === 'gameover'
   const myTurn = state.phase === 'playerTurn'
