@@ -29,8 +29,9 @@ export function Hub() {
         <p className="mb-2 text-sm uppercase tracking-[0.3em] text-gold/80">Take a seat</p>
         <h1 className="font-display text-4xl font-bold text-card sm:text-5xl">Full Deck</h1>
         <p className="mx-auto mt-3 max-w-md text-card/75">
-          A handful of classic card games, built from scratch — real shuffling, dealing, and
-          game logic, with cards drawn live from the Deck of Cards API.
+          Ten classic card games, built from scratch — real shuffling, dealing, and game
+          logic, with cards drawn live from the Deck of Cards API. Six play head-to-head
+          with a friend over a join-code link.
         </p>
       </section>
 
