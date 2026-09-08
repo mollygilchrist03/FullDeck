@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useMuted } from '../hooks/useMuted'
 import { toggleMuted } from '../lib/soundSettings'
+import { useAuth } from '../hooks/authContext'
 
 interface LayoutProps {
   /** Shown in the top bar; omit on the hub. */
@@ -15,7 +16,9 @@ export function Layout({ title, action, children }: LayoutProps) {
   const path = useLocation().pathname
   const onLeaderboard = path === '/leaderboard'
   const onMultiplayer = path === '/multiplayer' || path.startsWith('/room/')
+  const onAccount = path === '/account'
   const muted = useMuted()
+  const { user } = useAuth()
 
   return (
     <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 pb-36 pt-4 sm:pb-8">
@@ -60,6 +63,15 @@ export function Layout({ title, action, children }: LayoutProps) {
               aria-label="Leaderboard"
             >
               🏆<span className="ml-1 hidden sm:inline">Leaderboard</span>
+            </Link>
+          )}
+          {!onAccount && (
+            <Link
+              to="/account"
+              className="max-w-[9rem] truncate rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5"
+              aria-label={user ? 'Your account' : 'Sign in'}
+            >
+              👤<span className="ml-1 hidden sm:inline">{user ? user.displayName : 'Sign in'}</span>
             </Link>
           )}
           {action}

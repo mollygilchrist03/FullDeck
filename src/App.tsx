@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Hub } from './games/hub/Hub'
 import { Loading } from './components/Loading'
+import { AuthProvider } from './hooks/useAuth'
 
 // Route-level code splitting: the hub (the very first thing anyone sees) loads
 // eagerly, every game and the multiplayer/leaderboard screens load on demand
@@ -25,27 +26,31 @@ const Multiplayer = lazy(() =>
   import('./games/multiplayer/Multiplayer').then((m) => ({ default: m.Multiplayer })),
 )
 const Room = lazy(() => import('./games/multiplayer/Room').then((m) => ({ default: m.Room })))
+const Account = lazy(() => import('./games/account/Account').then((m) => ({ default: m.Account })))
 
 export function App() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Routes>
-        <Route path="/" element={<Hub />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
-        <Route path="/multiplayer" element={<Multiplayer />} />
-        <Route path="/room/:code" element={<Room />} />
-        <Route path="/blackjack" element={<Blackjack />} />
-        <Route path="/memory" element={<Memory />} />
-        <Route path="/war" element={<War />} />
-        <Route path="/high-low" element={<HighLow />} />
-        <Route path="/holdem" element={<HoldEm />} />
-        <Route path="/crazy-eights" element={<CrazyEights />} />
-        <Route path="/slapjack" element={<Slapjack />} />
-        <Route path="/go-fish" element={<GoFish />} />
-        <Route path="/trash" element={<Trash />} />
-        <Route path="/old-maid" element={<OldMaid />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <AuthProvider>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={<Hub />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/multiplayer" element={<Multiplayer />} />
+          <Route path="/room/:code" element={<Room />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/blackjack" element={<Blackjack />} />
+          <Route path="/memory" element={<Memory />} />
+          <Route path="/war" element={<War />} />
+          <Route path="/high-low" element={<HighLow />} />
+          <Route path="/holdem" element={<HoldEm />} />
+          <Route path="/crazy-eights" element={<CrazyEights />} />
+          <Route path="/slapjack" element={<Slapjack />} />
+          <Route path="/go-fish" element={<GoFish />} />
+          <Route path="/trash" element={<Trash />} />
+          <Route path="/old-maid" element={<OldMaid />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </AuthProvider>
   )
 }
