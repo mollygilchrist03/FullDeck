@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   BIG_BLIND,
   holdemReducer,
+  maxBetTo,
   revealedBoard,
   SMALL_BLIND,
   STARTING_STACK,
   toCall,
   type HoldemState,
 } from './holdemReducer'
-import { card } from '../../test/helpers'
+import { chooseAiAction } from './holdemLogic'
+import { card, shuffledDeck } from '../../test/helpers'
 import type { Card } from '../../types/card'
 
 const HOLE_A: [Card, Card] = [card('ACE', 'SPADES'), card('KING', 'SPADES')]
@@ -196,5 +198,43 @@ describe('match play', () => {
     s = { ...s, aiStack: 0, phase: 'handover', matchWinner: 'player' }
     const s2 = holdemReducer(s, { type: 'NEW_HAND', playerHole: HOLE_A, aiHole: HOLE_B, board: BOARD })
     expect(s2).toBe(s)
+  })
+})
+
+describe('holdem full-match fuzz', () => {
+  it('every match reaches a winner with chips conserved — no stuck betting (150 matches)', () => {
+    const dealArgs = () => {
+      const d = shuffledDeck()
+      return {
+        playerHole: [d[0], d[1]] as [Card, Card],
+        aiHole: [d[2], d[3]] as [Card, Card],
+        board: d.slice(4, 9),
+      }
+    }
+    for (let match = 0; match < 150; match += 1) {
+      let s = holdemReducer(undefined as unknown as HoldemState, { type: 'START', ...dealArgs() })
+      let steps = 0
+      while (!s.matchWinner && steps < 6000) {
+        steps += 1
+        if (s.phase === 'handover') {
+          s = holdemReducer(s, { type: 'NEW_HAND', ...dealArgs() })
+          continue
+        }
+        const side = s.toAct
+        if (side === 'ai') {
+          const d = chooseAiAction(s)
+          s = d.type === 'BET' ? holdemReducer(s, { type: 'BET', side: 'ai', to: d.to }) : holdemReducer(s, { type: d.type, side: 'ai' })
+          continue
+        }
+        // Player: mostly check/call, sometimes fold, sometimes shove.
+        const call = toCall(s, 'player')
+        const r = Math.random()
+        if (r < 0.08) s = holdemReducer(s, { type: 'FOLD', side: 'player' })
+        else if (r < 0.16 && s.playerStack > 0) s = holdemReducer(s, { type: 'BET', side: 'player', to: maxBetTo(s, 'player') })
+        else s = holdemReducer(s, { type: call === 0 ? 'CHECK' : 'CALL', side: 'player' })
+      }
+      expect(s.matchWinner).not.toBeNull()
+      expect(s.playerStack + s.aiStack + s.pot + s.playerBet + s.aiBet).toBe(STARTING_STACK * 2)
+    }
   })
 })

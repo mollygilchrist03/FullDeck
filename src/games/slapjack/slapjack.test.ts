@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { initSlapjack, isJack, slapjackReducer, type SlapjackState } from './slapjackReducer'
-import { card } from '../../test/helpers'
+import { card, shuffledDeck } from '../../test/helpers'
 import type { Card } from '../../types/card'
 
 const deck = (ranks: Parameters<typeof card>[0][]): Card[] => ranks.map((r) => card(r))
@@ -63,5 +63,28 @@ describe('slapjackReducer', () => {
     s = slapjackReducer(s, { type: 'SLAP', who: 'ai' }) // dealer beats player to it
     expect(s.phase).toBe('gameover')
     expect(s.winner).toBe('ai') // dealer holds both cards, player has none
+  })
+
+  it('every deal plays to a finish — no stuck state (fuzz, 300 random games)', () => {
+    for (let game = 0; game < 300; game += 1) {
+      const d = shuffledDeck()
+      let s = slapjackReducer(initSlapjack(), {
+        type: 'START',
+        playerPile: d.slice(0, 26),
+        aiPile: d.slice(26),
+      })
+      let steps = 0
+      while (s.phase !== 'gameover' && steps < 4000) {
+        steps += 1
+        if (s.phase === 'slap') {
+          // Random racer takes the Jack; also throw in the occasional false slap.
+          s = slapjackReducer(s, { type: 'SLAP', who: Math.random() < 0.5 ? 'player' : 'ai' })
+        } else {
+          s = slapjackReducer(s, { type: 'FLIP' })
+        }
+      }
+      expect(s.phase).toBe('gameover')
+      expect(s.winner).not.toBeNull()
+    }
   })
 })

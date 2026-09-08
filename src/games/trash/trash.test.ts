@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { firstOpenSlot, isLayoutComplete, placementFor } from './trashLogic'
 import { initTrash, trashReducer, type TrashState } from './trashReducer'
-import { card, hand } from '../../test/helpers'
+import { card, hand, shuffledDeck } from '../../test/helpers'
 import type { Card } from '../../types/card'
 
 describe('placementFor', () => {
@@ -116,5 +116,33 @@ describe('trashReducer', () => {
     })
     expect(s.playerSize).toBe(1)
     expect(s.round).toBe(2)
+  })
+
+  it('every match plays to a finish — no stuck state (fuzz, 200 random matches)', () => {
+    const deal = (pN: number, aN: number) => {
+      const d = shuffledDeck()
+      return { playerFaceDown: d.slice(0, pN), aiFaceDown: d.slice(pN, pN + aN), stock: d.slice(pN + aN) }
+    }
+    for (let game = 0; game < 200; game += 1) {
+      let s = trashReducer(initTrash(), { type: 'START', ...deal(10, 10) })
+      let steps = 0
+      while (s.phase !== 'gameover' && steps < 8000) {
+        steps += 1
+        if (s.phase === 'aiTurn') {
+          s = trashReducer(s, { type: 'AI_STEP' })
+        } else if (s.phase === 'wildChoice') {
+          const slots = s.turn === 'player' ? s.playerSlots : s.aiSlots
+          s = trashReducer(s, { type: 'PLACE_WILD', slot: Math.max(0, firstOpenSlot(slots)) })
+        } else if (s.phase === 'roundOver') {
+          const pN = s.roundWinner === 'player' ? s.playerSize - 1 : s.playerSize
+          const aN = s.roundWinner === 'ai' ? s.aiSize - 1 : s.aiSize
+          s = trashReducer(s, { type: 'NEXT_ROUND', ...deal(pN, aN) })
+        } else {
+          s = trashReducer(s, { type: Math.random() < 0.7 ? 'DRAW' : 'TAKE_DISCARD' })
+        }
+      }
+      expect(s.phase).toBe('gameover')
+      expect(s.matchWinner).not.toBeNull()
+    }
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { discardPairs, removeOneQueen } from './oldMaidLogic'
 import { initOldMaid, oldMaidReducer, type OldMaidState } from './oldMaidReducer'
-import { hand } from '../../test/helpers'
+import { hand, shuffledDeck } from '../../test/helpers'
 import type { Card } from '../../types/card'
 
 describe('removeOneQueen', () => {
@@ -72,5 +72,24 @@ describe('oldMaidReducer', () => {
   it('ignores an out-of-range draw index', () => {
     const s = start(hand('KING'), hand('7', 'QUEEN'))
     expect(oldMaidReducer(s, { type: 'DRAW', index: 9 })).toBe(s)
+  })
+
+  it('every deal plays to a finish — no stuck state (fuzz, 400 random games)', () => {
+    for (let game = 0; game < 400; game += 1) {
+      const d = removeOneQueen(shuffledDeck())
+      let s = oldMaidReducer(initOldMaid(), {
+        type: 'START',
+        playerHand: d.slice(0, 26),
+        aiHand: d.slice(26),
+      })
+      let steps = 0
+      while (s.phase !== 'gameover' && steps < 2000) {
+        steps += 1
+        const opp = s.turn === 'player' ? s.aiHand : s.playerHand
+        s = oldMaidReducer(s, { type: 'DRAW', index: Math.floor(Math.random() * opp.length) })
+      }
+      expect(s.phase).toBe('gameover')
+      expect(s.winner).not.toBeNull()
+    }
   })
 })

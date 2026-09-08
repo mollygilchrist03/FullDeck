@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { chooseAiPlay, isPlayable, strongestSuit } from './crazyEightsLogic'
+import { chooseAiPlay, isPlayable, playableCards, strongestSuit, SUITS } from './crazyEightsLogic'
 import {
+  canDraw,
   crazyEightsReducer,
+  HAND_SIZE,
   initCrazyEights,
+  playerHasMove,
   topCard,
   type CrazyEightsState,
 } from './crazyEightsReducer'
-import { card } from '../../test/helpers'
+import { card, shuffledDeck } from '../../test/helpers'
 
 describe('isPlayable', () => {
   const top = card('7', 'HEARTS')
@@ -216,5 +219,42 @@ describe('crazyEightsReducer', () => {
     expect(s.playerHand).toHaveLength(2) // drew one
     expect(s.discard).toHaveLength(1) // recycled down to the top card
     expect(s.stock.length).toBe(1) // 2 recycled, 1 drawn
+  })
+
+  it('every deal plays to a finish — no stuck state (fuzz, 300 random games)', () => {
+    for (let game = 0; game < 300; game += 1) {
+      const d = shuffledDeck()
+      const playerHand = d.slice(0, HAND_SIZE)
+      const aiHand = d.slice(HAND_SIZE, HAND_SIZE * 2)
+      const rest = d.slice(HAND_SIZE * 2)
+      const starterIdx = Math.max(0, rest.findIndex((c) => c.rank !== '8'))
+      let s = crazyEightsReducer(initCrazyEights(), {
+        type: 'START',
+        stock: rest.filter((_, i) => i !== starterIdx),
+        discard: [rest[starterIdx]],
+        playerHand,
+        aiHand,
+        activeSuit: rest[starterIdx].suit,
+      })
+      let steps = 0
+      while (s.phase !== 'gameover' && steps < 3000) {
+        steps += 1
+        if (s.phase === 'aiTurn' || (s.phase === 'awaitSuit' && s.wildSide === 'ai')) {
+          s = crazyEightsReducer(s, { type: 'AI_STEP' })
+        } else if (s.phase === 'awaitSuit') {
+          s = crazyEightsReducer(s, { type: 'CHOOSE_SUIT', suit: SUITS[game % 4] })
+        } else if (playerHasMove(s)) {
+          const legal = playableCards(s.playerHand, topCard(s), s.activeSuit)
+          const idx = s.playerHand.findIndex((c) => c.code === legal[0].code)
+          s = crazyEightsReducer(s, { type: 'PLAY', index: idx })
+        } else if (canDraw(s)) {
+          s = crazyEightsReducer(s, { type: 'DRAW' })
+        } else {
+          s = crazyEightsReducer(s, { type: 'PASS' })
+        }
+      }
+      expect(s.phase).toBe('gameover')
+      expect(s.winner).not.toBeNull()
+    }
   })
 })
