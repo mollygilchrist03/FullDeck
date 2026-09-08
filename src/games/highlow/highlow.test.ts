@@ -1,7 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { judge } from './highLowLogic'
+import { judge, remainingCounts } from './highLowLogic'
 import { highLowReducer, initHighLow } from './highLowReducer'
 import { card } from '../../test/helpers'
+
+describe('remainingCounts', () => {
+  it('splits a fresh deck around the current card (aces high)', () => {
+    // Current is a 7 (only card seen). Higher = 8..A = 7 ranks * 4 = 28.
+    // Lower = 2..6 = 5 ranks * 4 = 20. Equal = the other three 7s.
+    const r = remainingCounts(card('7'), [card('7')])
+    expect(r).toEqual({ higher: 28, lower: 20, equal: 3 })
+    expect(r.higher + r.lower + r.equal).toBe(51)
+  })
+
+  it('subtracts every card already turned over', () => {
+    const seen = [card('7'), card('9'), card('9'), card('2'), card('ACE')]
+    const r = remainingCounts(card('7'), seen)
+    // Higher (8..A): 28 total minus two 9s minus one ace = 25.
+    expect(r.higher).toBe(25)
+    // Lower (2..6): 20 total minus one 2 = 19.
+    expect(r.lower).toBe(19)
+    expect(r.equal).toBe(3)
+    expect(r.higher + r.lower + r.equal).toBe(52 - seen.length)
+  })
+
+  it('an ace has nothing above it', () => {
+    expect(remainingCounts(card('ACE'), [card('ACE')]).higher).toBe(0)
+  })
+})
 
 describe('judge', () => {
   it('rewards a correct higher call', () => {
@@ -36,6 +61,14 @@ describe('highLowReducer', () => {
     expect(s.phase).toBe('guessing')
     expect(s.current?.rank).toBe('8')
     expect(s.seen).toBe(1)
+    expect(s.seenCards.map((c) => c.rank)).toEqual(['8'])
+  })
+
+  it('records every card turned over for the counter', () => {
+    let s = highLowReducer(started(), { type: 'GUESS', guess: 'higher', next: card('KING') })
+    s = highLowReducer(s, { type: 'CONTINUE' })
+    s = highLowReducer(s, { type: 'GUESS', guess: 'lower', next: card('4') })
+    expect(s.seenCards.map((c) => c.rank)).toEqual(['8', 'KING', '4'])
   })
 
   it('extends the streak on a correct guess and waits to continue', () => {

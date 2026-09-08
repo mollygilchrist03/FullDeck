@@ -42,8 +42,10 @@ per side, higher up-card sweeps the table (repeats on another tie). Won cards ar
 shuffled back in so games terminate; the match ends when a player holds all 52.
 
 **High-Low.** One card face-up; call whether the next is higher or lower and
-build a streak. Aces are high, equal ranks are a push. Best streak for the
-session is tracked.
+build a streak. Aces are high, equal ranks are a push. A live counter under
+the card shows how many cards above / below / equal are still in the
+(genuinely depleting) deck, so you can count like the house does. Best
+streak for the session is tracked.
 
 **Texas Hold'em.** Heads-up, no-limit, against the house. Two hole cards each,
 five community cards revealed in stages (flop, turn, river), and real betting —
@@ -277,7 +279,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **222 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **231 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
   profanity filter, auth input rules, leaderboard validation/formatting, and

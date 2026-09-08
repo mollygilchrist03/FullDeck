@@ -8,6 +8,7 @@ import { ScoreSubmit } from '../../components/ScoreSubmit'
 import { GameRules } from '../../components/GameRules'
 import { feedback } from '../../lib/feedback'
 import { useRecordGameOnce } from '../../hooks/useRecordGame'
+import { remainingCounts } from './highLowLogic'
 import { highLowReducer, initHighLow } from './highLowReducer'
 
 const JUDGEMENT_TEXT = {
@@ -82,6 +83,7 @@ export function HighLow() {
   const shown = state.revealed ?? state.current
   const won = state.phase === 'won'
   const over = state.phase === 'gameover' || won
+  const counts = shown ? remainingCounts(shown, state.seenCards) : null
 
   return (
     <Layout
@@ -102,7 +104,7 @@ export function HighLow() {
         <GameRules>
           <p>One card is face up. Call whether the <strong>next</strong> card will be higher or lower. Aces are high.</p>
           <p>Right: your streak grows and the new card becomes the one to beat. Wrong: the run ends. Same rank: a push — the streak holds and nothing changes.</p>
-          <p>Your longest streak in a session is your score.</p>
+          <p>The counter under the card shows how many cards are still in the deck above, below, and equal to it — the deck depletes as you go, so the odds shift. Your longest streak in a session is your score.</p>
         </GameRules>
       </div>
 
@@ -126,6 +128,21 @@ export function HighLow() {
           </div>
 
           <div className="w-32 sm:w-40">{shown && <Card card={shown} faceDown={false} dealt />}</div>
+
+          {counts && !over && (
+            <div
+              className="flex items-center gap-4 text-sm tabular-nums text-card/70"
+              aria-label={`${counts.higher} higher, ${counts.equal} same, ${counts.lower} lower still in the deck`}
+            >
+              <span className={counts.higher > counts.lower ? 'font-bold text-gold' : ''}>
+                ▲ {counts.higher} higher
+              </span>
+              <span className="text-card/40">= {counts.equal} same</span>
+              <span className={counts.lower > counts.higher ? 'font-bold text-gold' : ''}>
+                ▼ {counts.lower} lower
+              </span>
+            </div>
+          )}
 
           {state.lastJudgement && (
             <p

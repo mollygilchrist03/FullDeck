@@ -16,6 +16,8 @@ export interface HighLowState {
   streak: number
   /** Cards turned over this run, including the starting card. */
   seen: number
+  /** Every card turned over this run — feeds the higher/lower/equal counter. */
+  seenCards: Card[]
   phase: HighLowPhase
 }
 
@@ -33,6 +35,7 @@ export function initHighLow(): HighLowState {
     lastJudgement: null,
     streak: 0,
     seen: 0,
+    seenCards: [],
     phase: 'idle',
   }
 }
@@ -40,7 +43,13 @@ export function initHighLow(): HighLowState {
 export function highLowReducer(state: HighLowState, action: HighLowAction): HighLowState {
   switch (action.type) {
     case 'START':
-      return { ...initHighLow(), current: action.first, seen: 1, phase: 'guessing' }
+      return {
+        ...initHighLow(),
+        current: action.first,
+        seen: 1,
+        seenCards: [action.first],
+        phase: 'guessing',
+      }
 
     case 'GUESS': {
       if (state.phase !== 'guessing' || !state.current) return state
@@ -55,6 +64,7 @@ export function highLowReducer(state: HighLowState, action: HighLowAction): High
         lastJudgement: verdict,
         streak: verdict === 'correct' ? state.streak + 1 : state.streak,
         seen,
+        seenCards: [...state.seenCards, action.next],
         phase,
       }
     }
