@@ -16,5 +16,5 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force"
   },
-  "include": ["api", "db", "drizzle.config.ts"]
+  "include": ["api", "db", "server", "drizzle.config.ts"]
 }
