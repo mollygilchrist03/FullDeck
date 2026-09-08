@@ -313,6 +313,7 @@ npm run dev      # http://localhost:5173  (games work; /api is not served here)
 npm test         # logic, leaderboard, auth-rules, and component tests (offline)
 npm run build    # tsc typecheck (app + api) + production build
 npm run lint
+npm run size     # bundle-size budget (fails if the entry chunk grows past ~83 kB gzipped)
 ```
 
 The leaderboard needs the serverless function, which plain `vite` doesn't run.

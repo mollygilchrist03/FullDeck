@@ -30,3 +30,6 @@ jobs:
 
       - name: Build
         run: npx vite build
+
+      - name: Bundle-size budget
+        run: npx size-limit
