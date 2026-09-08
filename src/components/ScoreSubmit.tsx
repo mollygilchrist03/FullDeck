@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from './Button'
 import { submitScore } from '../hooks/useLeaderboard'
+import { useAuth } from '../hooks/authContext'
 import { formatScore, GAMES, NAME_MAX, type GameKey } from '../lib/leaderboard'
 import { isCleanName } from '../lib/profanity'
 
@@ -27,17 +28,47 @@ interface ScoreSubmitProps {
   score: number
 }
 
-/** Compact "add this result to the shared leaderboard" box for a game's end screen. */
+/** Compact "add this result to the shared leaderboard" box for a game's end
+ * screen. Signed-in players post under their account name; if they've turned
+ * on auto-post it happens on its own with no form at all. */
 export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
   const meta = GAMES[game]
-  const [name, setName] = useState(loadName)
+  const { user } = useAuth()
+  const [name, setName] = useState(() => user?.displayName ?? loadName())
   const [website, setWebsite] = useState('') // honeypot — see the field below
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
+  const autoTried = useRef(false)
 
-  if (score < meta.min || score > meta.max) return null
+  const inRange = score >= meta.min && score <= meta.max
 
-  const send = async () => {
+  const send = async (submitName: string, remember: boolean) => {
+    setStatus('sending')
+    setMessage(null)
+    if (remember) rememberName(submitName)
+    const result = await submitScore(game, submitName, score, website)
+    if (result.ok) {
+      setStatus('done')
+      const who = result.name ? ` as ${result.name}` : ''
+      setMessage(result.rank ? `Posted${who} — you're #${result.rank}.` : `Posted${who}.`)
+    } else {
+      setStatus('error')
+      setMessage(result.error ?? 'Could not submit.')
+    }
+  }
+
+  // Auto-post once for opted-in accounts.
+  useEffect(() => {
+    if (!inRange || autoTried.current) return
+    if (user?.autoPost) {
+      autoTried.current = true
+      void send(user.displayName, false)
+    }
+  }, [inRange, user]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!inRange) return null
+
+  const submitTyped = () => {
     const trimmed = name.trim()
     if (!trimmed) {
       setStatus('error')
@@ -49,17 +80,7 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
       setMessage('Please pick a name without profanity.')
       return
     }
-    setStatus('sending')
-    setMessage(null)
-    rememberName(trimmed)
-    const result = await submitScore(game, trimmed, score, website)
-    if (result.ok) {
-      setStatus('done')
-      setMessage(result.rank ? `Logged — you're #${result.rank}.` : 'Logged.')
-    } else {
-      setStatus('error')
-      setMessage(result.error ?? 'Could not submit.')
-    }
+    void send(trimmed, !user)
   }
 
   return (
@@ -70,6 +91,10 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
 
       {status === 'done' ? (
         <p className="mt-2 text-sm font-semibold text-gold">{message}</p>
+      ) : user?.autoPost ? (
+        <p className="mt-2 text-sm text-card/70">
+          {status === 'sending' ? 'Posting to the leaderboard…' : message}
+        </p>
       ) : (
         <>
           <div className="mt-3 flex gap-2">
@@ -79,7 +104,7 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
               maxLength={NAME_MAX}
               placeholder="Your name"
               className="min-w-0 flex-1 rounded-lg border border-gold/40 bg-felt px-3 py-2 text-sm text-card placeholder:text-card/40 focus:border-gold focus:outline-none"
-              onKeyDown={(e) => e.key === 'Enter' && void send()}
+              onKeyDown={(e) => e.key === 'Enter' && submitTyped()}
             />
             {/* Honeypot: invisible to a real visitor (off-screen, unlabelled,
                 skipped by tab order and screen readers), but a form-filling
@@ -94,10 +119,16 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
               autoComplete="off"
               className="absolute left-[-9999px] h-0 w-0 opacity-0"
             />
-            <Button variant="gold" onClick={() => void send()} disabled={status === 'sending'}>
+            <Button variant="gold" onClick={submitTyped} disabled={status === 'sending'}>
               {status === 'sending' ? '…' : 'Submit'}
             </Button>
           </div>
+          {user ? (
+            <p className="mt-2 text-xs text-card/50">
+              Posting as <strong className="text-card/70">{user.displayName}</strong>. Turn on
+              auto-post in your account to skip this.
+            </p>
+          ) : null}
           {message && (
             <p className={`mt-2 text-sm ${status === 'error' ? 'text-casino' : 'text-card/70'}`}>
               {message}

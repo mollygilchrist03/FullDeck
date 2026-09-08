@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm'
 import { getDb, isDbConfigured } from '../db/client.js'
-import { scores, submissionLog } from '../db/schema.js'
+import { gameResults, scores, submissionLog } from '../db/schema.js'
 import {
   GAMES,
   isGameKey,
@@ -11,6 +11,7 @@ import {
   type GameKey,
 } from '../src/lib/leaderboard.js'
 import { isCleanName } from '../src/lib/profanity.js'
+import { sessionUser } from '../server/auth.js'
 
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 50
@@ -156,27 +157,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ error: 'Unknown or missing game.' })
         return
       }
-      const name = sanitizeName(body.name)
-      if (!name) {
-        res.status(400).json({ error: 'A name is required.' })
-        return
-      }
-      if (!isCleanName(name)) {
-        res.status(400).json({ error: 'Please pick a name without profanity.' })
-        return
-      }
       if (!isValidScore(game, body.score)) {
         res.status(400).json({ error: 'Score is out of range.' })
         return
       }
 
       const db = getDb()
+      // A signed-in submitter posts under their (already-validated) account
+      // name; everyone else types one, which is sanitised and profanity-checked.
+      const me = await sessionUser(db, req.headers.cookie)
+      let name: string
+      if (me) {
+        name = me.displayName
+      } else {
+        name = sanitizeName(body.name)
+        if (!name) {
+          res.status(400).json({ error: 'A name is required.' })
+          return
+        }
+        if (!isCleanName(name)) {
+          res.status(400).json({ error: 'Please pick a name without profanity.' })
+          return
+        }
+      }
+
       const [row] = await db
         .insert(scores)
         .values({ game, name, score: body.score })
         .returning({ id: scores.id, createdAt: scores.createdAt })
       const rank = await rankOf(game, body.score, row.createdAt)
-      res.status(201).json({ ok: true, rank })
+
+      if (me) {
+        // Flag the matching just-recorded history rows as posted, so the
+        // account page can show which games made the board.
+        await db
+          .update(gameResults)
+          .set({ postedToLeaderboard: true })
+          .where(
+            and(
+              eq(gameResults.userId, me.id),
+              eq(gameResults.game, game),
+              eq(gameResults.postedToLeaderboard, false),
+              gt(gameResults.createdAt, new Date(Date.now() - 5 * 60_000)),
+            ),
+          )
+      }
+
+      res.status(201).json({ ok: true, rank, name })
       return
     }
 

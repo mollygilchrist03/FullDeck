@@ -54,6 +54,8 @@ export function useLeaderboard(game: GameKey, limit = 10): UseLeaderboard {
 export interface SubmitResult {
   ok: boolean
   rank?: number
+  /** The name the score was actually filed under (the account name when signed in). */
+  name?: string
   error?: string
 }
 
@@ -72,7 +74,7 @@ export async function submitScore(
     })
     const data = await readJson(res)
     if (!res.ok) return { ok: false, error: (data.error as string) ?? 'Could not submit your score.' }
-    return { ok: true, rank: data.rank as number }
+    return { ok: true, rank: data.rank as number, name: data.name as string | undefined }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not submit your score.' }
   }
