@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { chooseAiAsk, takeBooks } from './goFishLogic'
+import { chooseAiAsk, ranksIn, takeBooks } from './goFishLogic'
 import { goFishReducer, initGoFish, type GoFishState } from './goFishReducer'
-import { hand } from '../../test/helpers'
+import { hand, shuffledDeck } from '../../test/helpers'
 
 describe('takeBooks', () => {
   it('pulls a completed four and keeps the rest', () => {
@@ -158,5 +158,31 @@ describe('goFishReducer', () => {
     expect(s.phase).toBe('gameover')
     expect(s.winner).toBe('player')
     expect(s.playerBooks).toContain('ACE')
+  })
+
+  it('every deal plays to a finish — no stuck state (fuzz, 400 random games)', () => {
+    for (let game = 0; game < 400; game += 1) {
+      const d = shuffledDeck()
+      let s = goFishReducer(initGoFish(), {
+        type: 'START',
+        playerHand: d.slice(0, 7),
+        aiHand: d.slice(7, 14),
+        stock: d.slice(14),
+      })
+      let steps = 0
+      while (s.phase !== 'gameover' && steps < 5000) {
+        steps += 1
+        if (s.phase === 'playerAsk') {
+          const opts = ranksIn(s.playerHand)
+          s = goFishReducer(s, { type: 'ASK', rank: opts[Math.floor(Math.random() * opts.length)] })
+        } else if (s.phase === 'playerDraw') {
+          s = goFishReducer(s, { type: 'DRAW' })
+        } else {
+          s = goFishReducer(s, { type: 'AI_STEP' })
+        }
+      }
+      expect(s.phase).toBe('gameover')
+      expect(s.playerBooks.length + s.aiBooks.length).toBe(13)
+    }
   })
 })

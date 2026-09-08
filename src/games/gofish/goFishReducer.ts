@@ -148,10 +148,14 @@ function doAsk(state: GoFishState, asker: Side, rank: Rank): GoFishState {
     let s: GoFishState = { ...state, knownPlayerRanks: known, turnsTaken }
     s = withHand(s, asker, [...handOf(s, asker), ...taken])
     s = withHand(s, opp, handOf(s, opp).filter((c) => c.rank !== rank))
-    return bookAndCheck({
+    const booked = bookAndCheck({
       ...s,
       log: push(state.log, `${name(opp)} hands over ${taken.length} × ${RANK_LABEL[rank]}. Go again.`),
     })
+    // "Go again" — but if that hit emptied the asker's hand (booked their
+    // last rank), route through toTurn so they draw up or pass instead of
+    // being stuck on an ask they can't make.
+    return toTurn(booked, asker)
   }
 
   return {
@@ -186,7 +190,7 @@ function doDraw(state: GoFishState, drawer: Side): GoFishState {
 
   if (state.pendingRank != null) {
     return matched
-      ? { ...s, phase: askPhase(drawer), pendingRank: null }
+      ? toTurn(s, drawer) // fished what you asked for — go again (or draw up / pass if now empty)
       : toTurn({ ...s, pendingRank: null }, other(drawer))
   }
   // Draw-up.

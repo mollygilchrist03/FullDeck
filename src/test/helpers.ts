@@ -33,3 +33,23 @@ export function card(rank: Rank, suit: Suit = 'SPADES'): Card {
 export function hand(...ranks: Rank[]): Card[] {
   return ranks.map((r) => card(r))
 }
+
+const ALL_RANKS: Rank[] = [
+  'ACE', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'JACK', 'QUEEN', 'KING',
+]
+const ALL_SUITS: Suit[] = ['HEARTS', 'DIAMONDS', 'CLUBS', 'SPADES']
+
+/** A full 52-card deck, in order. */
+export function fullDeck(): Card[] {
+  return ALL_SUITS.flatMap((s) => ALL_RANKS.map((r) => card(r, s)))
+}
+
+/** A full deck, shuffled with Math.random — for completion/fuzz tests. */
+export function shuffledDeck(): Card[] {
+  const d = fullDeck()
+  for (let i = d.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[d[i], d[j]] = [d[j], d[i]]
+  }
+  return d
+}
