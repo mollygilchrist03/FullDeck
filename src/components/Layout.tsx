@@ -3,6 +3,10 @@ import { Link, useLocation } from 'react-router-dom'
 import { useMuted } from '../hooks/useMuted'
 import { toggleMuted } from '../lib/soundSettings'
 import { useAuth } from '../hooks/authContext'
+import { Icon } from './Icon'
+
+const NAV_LINK =
+  'inline-flex items-center gap-1.5 rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5'
 
 interface LayoutProps {
   /** Shown in the top bar; omit on the hub. */
@@ -41,37 +45,34 @@ export function Layout({ title, action, children }: LayoutProps) {
           <button
             type="button"
             onClick={toggleMuted}
-            className="rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5"
+            className={NAV_LINK}
             aria-label={muted ? 'Unmute sound and haptics' : 'Mute sound and haptics'}
             aria-pressed={muted}
           >
-            {muted ? '🔇' : '🔊'}
+            <Icon name={muted ? 'volume-mute' : 'volume-up'} />
           </button>
           {!onMultiplayer && (
-            <Link
-              to="/multiplayer"
-              className="rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5"
-              aria-label="Play with a friend"
-            >
-              👥<span className="ml-1 hidden sm:inline">Friend</span>
+            <Link to="/multiplayer" className={NAV_LINK} aria-label="Play with a friend">
+              <Icon name="people" />
+              <span className="hidden sm:inline">Friend</span>
             </Link>
           )}
           {!onLeaderboard && (
-            <Link
-              to="/leaderboard"
-              className="rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5"
-              aria-label="Leaderboard"
-            >
-              🏆<span className="ml-1 hidden sm:inline">Leaderboard</span>
+            <Link to="/leaderboard" className={NAV_LINK} aria-label="Leaderboard">
+              <Icon name="trophy" />
+              <span className="hidden sm:inline">Leaderboard</span>
             </Link>
           )}
           {!onAccount && (
             <Link
               to="/account"
-              className="max-w-[9rem] truncate rounded-lg border border-gold/50 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-white/5"
+              className={`${NAV_LINK} max-w-[9rem]`}
               aria-label={user ? 'Your account' : 'Sign in'}
             >
-              👤<span className="ml-1 hidden sm:inline">{user ? user.displayName : 'Sign in'}</span>
+              <Icon name={user ? 'person-circle' : 'person-add'} />
+              <span className="hidden truncate sm:inline">
+                {user ? user.displayName : 'Sign in'}
+              </span>
             </Link>
           )}
           {action}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from './Button'
+import { Spinner } from './Loading'
 import { submitScore } from '../hooks/useLeaderboard'
 import { useAuth } from '../hooks/authContext'
 import { formatScore, GAMES, NAME_MAX, type GameKey } from '../lib/leaderboard'
@@ -120,7 +121,7 @@ export function ScoreSubmit({ game, score }: ScoreSubmitProps) {
               className="absolute left-[-9999px] h-0 w-0 opacity-0"
             />
             <Button variant="gold" onClick={submitTyped} disabled={status === 'sending'}>
-              {status === 'sending' ? '…' : 'Submit'}
+              {status === 'sending' ? <Spinner className="h-4 w-4" /> : 'Submit'}
             </Button>
           </div>
           {user ? (

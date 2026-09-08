@@ -1,5 +1,16 @@
+import { Icon } from './Icon'
+
 interface LoadingProps {
   label?: string
+}
+
+/** A small spinning icon for inline "working…" states (buttons, form rows). */
+export function Spinner({ className = '', label = 'Loading' }: { className?: string; label?: string }) {
+  return (
+    <span role="status" aria-label={label} className="inline-flex">
+      <Icon name="spinner" className={`animate-spin ${className}`} />
+    </span>
+  )
 }
 
 /** Non-blocking deck-fetch indicator: three shimmering card backs. */

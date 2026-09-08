@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
 import { Button } from '../../components/Button'
-import { Loading } from '../../components/Loading'
+import { Loading, Spinner } from '../../components/Loading'
 import { useAuth } from '../../hooks/authContext'
 import { GAMES, NAME_MAX, isGameKey } from '../../lib/leaderboard'
 import { PASSWORD_MIN } from '../../lib/auth'
@@ -137,7 +137,7 @@ function SignedOut() {
         </label>
 
         <Button variant="gold" onClick={() => void submit()} disabled={busy}>
-          {busy ? '…' : mode === 'register' ? 'Create account' : 'Sign in'}
+          {busy ? <Spinner className="h-4 w-4" /> : mode === 'register' ? 'Create account' : 'Sign in'}
         </Button>
         {error && <p className="text-sm text-casino">{error}</p>}
       </div>
