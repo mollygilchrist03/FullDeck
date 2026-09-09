@@ -5,29 +5,24 @@ import type { MpBoardProps } from './mpBoards.js'
 
 export function SlapjackRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as SlapjackState
-  const seat = view.youSeat ?? 0
-  const spectator = view.youSeat === null
-  const myRole = seat === 0 ? 'player' : 'ai'
-  const myPile = seat === 0 ? s.playerPile : s.aiPile
-  const theirPile = seat === 0 ? s.aiPile : s.playerPile
+  const seat = view.youSeat
+  const spectator = seat === null
   const over = s.phase === 'gameover'
   const jackUp = s.phase === 'slap' && isJack(centerTop(s))
-  const canFlip = !spectator && s.phase === 'flipping' && s.turn === myRole
+  const canFlip = seat !== null && s.phase === 'flipping' && s.turn === seat
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <div className="flex w-full max-w-sm justify-between text-center">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-gold/80">Opponent</p>
-          <p className="text-2xl font-bold tabular-nums text-card">{theirPile.length}</p>
-        </div>
+      <div className="flex w-full max-w-md flex-wrap justify-center gap-4 text-center">
+        {s.piles.map((pile, i) => (
+          <div key={i}>
+            <p className="text-xs uppercase tracking-widest text-gold/80">{i === seat ? 'You' : `Seat ${i + 1}`}</p>
+            <p className="text-2xl font-bold tabular-nums text-card">{pile.length}</p>
+          </div>
+        ))}
         <div>
           <p className="text-xs uppercase tracking-widest text-gold/80">Centre</p>
           <p className="text-2xl font-bold tabular-nums text-card">{s.center.length}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-widest text-gold/80">You</p>
-          <p className="text-2xl font-bold tabular-nums text-card">{myPile.length}</p>
         </div>
       </div>
 
@@ -45,9 +40,9 @@ export function SlapjackRoom({ view, send, sending }: MpBoardProps) {
 
       <p className="min-h-5 text-center text-sm text-card/75" role="status" aria-live="polite">
         {over
-          ? s.winner === myRole
+          ? s.winner === seat
             ? 'You hold every card — you win!'
-            : 'Your opponent swept the deck. You lose.'
+            : `Seat ${(s.winner ?? 0) + 1} swept the deck.`
           : s.log[s.log.length - 1]}
       </p>
 
@@ -66,7 +61,7 @@ export function SlapjackRoom({ view, send, sending }: MpBoardProps) {
             size="lg"
             variant="accent"
             className="flex-1"
-            onClick={() => send({ type: 'SLAP', who: myRole })}
+            onClick={() => seat !== null && send({ type: 'SLAP', who: seat })}
             disabled={spectator || sending}
           >
             Slap!

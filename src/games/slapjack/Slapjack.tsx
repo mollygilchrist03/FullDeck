@@ -12,9 +12,12 @@ import { centerTop, initSlapjack, isJack, slapjackReducer } from './slapjackRedu
 
 const rand = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo))
 
+const YOU = 0
+const AI = 1
+
 export function Slapjack() {
   const deck = useDeck()
-  const [state, dispatch] = useReducer(slapjackReducer, undefined, initSlapjack)
+  const [state, dispatch] = useReducer(slapjackReducer, 2, initSlapjack)
   const [dealing, setDealing] = useState(true)
   const [bestMs, setBestMs] = useState<number | null>(null)
   const didInit = useRef(false)
@@ -29,7 +32,7 @@ export function Slapjack() {
     try {
       const cards = await drawCards(52)
       feedback('deal')
-      dispatch({ type: 'START', playerPile: cards.slice(0, 26), aiPile: cards.slice(26) })
+      dispatch({ type: 'START', piles: [cards.slice(0, 26), cards.slice(26)] })
     } catch {
       /* surfaced via deck.error */
     } finally {
@@ -45,7 +48,7 @@ export function Slapjack() {
 
   // The dealer flips on its turn.
   useEffect(() => {
-    if (state.phase !== 'flipping' || state.turn !== 'ai') return
+    if (state.phase !== 'flipping' || state.turn !== AI) return
     flipTick.current += 1
     const id = setTimeout(() => {
       feedback('flip')
@@ -67,21 +70,21 @@ export function Slapjack() {
     const delay = rand(600, 1400) + (Math.random() < 0.2 ? rand(1400, 3000) : 0)
     const id = setTimeout(() => {
       feedback('slap')
-      dispatch({ type: 'SLAP', who: 'ai' })
+      dispatch({ type: 'SLAP', who: AI })
     }, delay)
     return () => clearTimeout(id)
   }, [state.phase, state.center.length])
 
   useEffect(() => {
-    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
+    if (state.phase === 'gameover') feedback(state.winner === YOU ? 'win' : 'lose')
   }, [state.phase, state.winner])
 
   useRecordGameOnce({
     terminal: state.phase === 'gameover',
     game: 'slapjack',
-    score: state.winner === 'player' && bestMs != null ? bestMs : 0,
+    score: state.winner === YOU && bestMs != null ? bestMs : 0,
     detail:
-      state.winner === 'player'
+      state.winner === YOU
         ? bestMs != null
           ? `Won — fastest slap ${bestMs}ms`
           : 'Won'
@@ -94,12 +97,12 @@ export function Slapjack() {
       const ms = Math.round(performance.now() - slapOpenedAt.current)
       setBestMs((b) => (b == null ? ms : Math.min(b, ms)))
     }
-    dispatch({ type: 'SLAP', who: 'player' })
+    dispatch({ type: 'SLAP', who: YOU })
   }
 
   const over = state.phase === 'gameover'
   const jackUp = state.phase === 'slap' && isJack(centerTop(state))
-  const canFlip = state.phase === 'flipping' && state.turn === 'player'
+  const canFlip = state.phase === 'flipping' && state.turn === YOU
 
   return (
     <Layout
@@ -131,7 +134,7 @@ export function Slapjack() {
           <div className="flex w-full max-w-sm justify-between text-center">
             <div>
               <p className="text-xs uppercase tracking-widest text-gold/80">Dealer</p>
-              <p className="text-2xl font-bold tabular-nums text-card">{state.aiPile.length}</p>
+              <p className="text-2xl font-bold tabular-nums text-card">{state.piles[AI].length}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-gold/80">Centre</p>
@@ -139,7 +142,7 @@ export function Slapjack() {
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-gold/80">You</p>
-              <p className="text-2xl font-bold tabular-nums text-card">{state.playerPile.length}</p>
+              <p className="text-2xl font-bold tabular-nums text-card">{state.piles[YOU].length}</p>
             </div>
           </div>
 
@@ -180,9 +183,9 @@ export function Slapjack() {
           ) : (
             <div className="flex flex-col items-center gap-3">
               <p className="font-display text-xl text-gold">
-                {state.winner === 'player' ? 'You hold every card — you win!' : 'The dealer swept the deck. You lose.'}
+                {state.winner === YOU ? 'You hold every card — you win!' : 'The dealer swept the deck. You lose.'}
               </p>
-              {state.winner === 'player' && bestMs != null && (
+              {state.winner === YOU && bestMs != null && (
                 <ScoreSubmit game="slapjack" score={bestMs} />
               )}
               <Button size="lg" variant="gold" onClick={() => void newGame()}>

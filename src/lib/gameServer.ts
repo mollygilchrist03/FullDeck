@@ -57,14 +57,29 @@ const war: GameServer = {
   isOver: (s) => s.phase === 'gameover',
 }
 
+/** Split `cards` into `n` piles as evenly as possible — the first
+ * `cards.length % n` seats get one extra card. At n=2 this is the exact
+ * 26/26 split the 2-player game always used. */
+function splitPiles(cards: Card[], n: number): Card[][] {
+  const base = Math.floor(cards.length / n)
+  const extra = cards.length % n
+  const piles: Card[][] = []
+  let idx = 0
+  for (let i = 0; i < n; i += 1) {
+    const size = base + (i < extra ? 1 : 0)
+    piles.push(cards.slice(idx, idx + size))
+    idx += size
+  }
+  return piles
+}
+
 const slapjack: GameServer = {
-  deal: (c) =>
-    slapjackReducer(initSlapjack(), { type: 'START', playerPile: c.slice(0, 26), aiPile: c.slice(26) }),
+  deal: (c, seatCount) => slapjackReducer(initSlapjack(seatCount), { type: 'START', piles: splitPiles(c, seatCount) }),
   reduce: slapjackReducer,
   authorize: (s, seat, a) => {
     if (s.phase === 'gameover') return false
-    if (a?.type === 'FLIP') return s.phase === 'flipping' && (s.turn === role(seat))
-    if (a?.type === 'SLAP') return a.who === role(seat)
+    if (a?.type === 'FLIP') return s.phase === 'flipping' && s.turn === seat
+    if (a?.type === 'SLAP') return a.who === seat
     return false
   },
   isOver: (s) => s.phase === 'gameover',
