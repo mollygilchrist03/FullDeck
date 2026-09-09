@@ -40,6 +40,22 @@ async function loadRoom(code: string): Promise<RoomRow | undefined> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/** Rejects a POST whose `Origin` header names a different host than the one
+ * that served the request — same check as api/scores.ts and api/rooms.ts.
+ * No rate limit here: every in-progress game sends many of these (a check,
+ * a call, ...), unlike room creation, which happens once per room. */
+function originLooksForeign(req: VercelRequest): boolean {
+  const origin = req.headers.origin
+  if (typeof origin !== 'string') return false
+  const host = req.headers.host
+  if (typeof host !== 'string') return false
+  try {
+    return new URL(origin).host !== host
+  } catch {
+    return true
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!isDbConfigured) {
     res.status(503).json({ error: 'Multiplayer is not configured on this deployment.' })
@@ -74,6 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (originLooksForeign(req)) {
+        res.status(403).json({ error: 'Request rejected.' })
+        return
+      }
       const body = (req.body ?? {}) as Record<string, unknown>
       const op = body.op
       const room = await loadRoom(code)

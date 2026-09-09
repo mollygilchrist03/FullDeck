@@ -274,7 +274,12 @@ and free of any React or network concerns.
   raw address — so the 8-per-minute limit holds across every serverless
   instance, not just the one that happens to be warm. A honeypot field and an
   Origin check add two more cheap, no-dependency filters against the laziest
-  scripted abuse.
+  scripted abuse. [`api/rooms.ts`](api/rooms.ts) repeats the exact same
+  pattern against its own `room_attempts` table for room *creation* — kept
+  separate from `submission_log` so a burst of one doesn't throttle the
+  other — while every other room op ([`api/rooms/[code].ts`](api/rooms/[code].ts):
+  join, start, actions, next hand) only gets the Origin check, since a real
+  game legitimately sends many of those and rate-limiting them would break play.
 
 - **Hand-rolled auth on the same database** ([`server/auth.ts`](server/auth.ts),
   [`server/google.ts`](server/google.ts)). No auth SaaS: passwords are scrypt
@@ -351,8 +356,8 @@ The repo is connected to Vercel, so a push to `master` is a production deploy.
 
 **Database.** The live demo is wired to a Neon Postgres store (created from the
 Vercel project's **Storage** tab, which sets `DATABASE_URL`); the tables —
-`scores`, `submission_log`, `rooms`, `users`, `sessions`, `email_tokens`,
-`game_results`, `login_attempts` — come from [`db/schema.ts`](db/schema.ts)
+`scores`, `submission_log`, `rooms`, `room_attempts`, `users`, `sessions`,
+`email_tokens`, `game_results`, `login_attempts` — come from [`db/schema.ts`](db/schema.ts)
 via `npm run db:push`. To run your own, do the same and set `DATABASE_URL`
 for all environments. Until that's done the site still deploys and runs —
 the leaderboard, multiplayer, and accounts just report that they aren't

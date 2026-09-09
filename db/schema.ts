@@ -194,3 +194,18 @@ export const loginAttempts = pgTable(
 )
 
 export type LoginAttemptRow = typeof loginAttempts.$inferSelect
+
+/** Same salted-IP-hash rate-limit pattern as `submissionLog`/`loginAttempts`,
+ * kept in its own table so a burst of room creation doesn't also throttle an
+ * IP's unrelated score submissions or logins. */
+export const roomAttempts = pgTable(
+  'room_attempts',
+  {
+    id: serial('id').primaryKey(),
+    ipHash: varchar('ip_hash', { length: 64 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('room_attempts_ip_time_idx').on(t.ipHash, t.createdAt)],
+)
+
+export type RoomAttemptRow = typeof roomAttempts.$inferSelect
