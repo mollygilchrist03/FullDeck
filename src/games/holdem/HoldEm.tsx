@@ -72,7 +72,7 @@ export function HoldEm() {
   }, [state.seats])
 
   useRecordGameOnce({
-    terminal: state.matchWinner != null,
+    terminal: state.matchWinner != null || state.seats[YOU].eliminated,
     game: 'holdem',
     score: peakStack,
     detail: state.matchWinner === YOU ? `Won the match — peak stack $${peakStack}` : 'Lost the match',
@@ -100,6 +100,10 @@ export function HoldEm() {
   }, [state])
 
   const over = state.phase === 'handover'
+  // Once you've busted, there's no reason to keep dealing hand after hand
+  // just to watch the AI seats play each other out — treat it as match over
+  // for you immediately rather than waiting on their `matchWinner`.
+  const humanOut = state.seats[YOU].eliminated
   const myTurn = state.toAct === YOU
   const call = toCall(state, YOU)
   const pot = potTotal(state)
@@ -149,7 +153,7 @@ export function HoldEm() {
     <Layout
       title="Texas Hold'em"
       action={
-        state.matchWinner != null ? (
+        state.matchWinner != null || humanOut ? (
           <Button variant="gold" onClick={() => void dealNext('START', tableSize)} disabled={dealing}>
             New match
           </Button>
@@ -230,7 +234,7 @@ export function HoldEm() {
             </div>
             <p className="text-xs uppercase tracking-widest text-gold/80">
               You — ${state.seats[YOU].stack}
-              {state.seats[YOU].folded ? ' · folded' : ''}
+              {state.seats[YOU].eliminated ? ' · out' : state.seats[YOU].folded ? ' · folded' : ''}
               {over && !state.seats[YOU].folded && state.seats[YOU].hole.length > 0
                 ? ` · ${CATEGORY_LABEL[bestHandCategory(state.seats[YOU].hole, board)]}`
                 : ''}
@@ -244,12 +248,14 @@ export function HoldEm() {
                   ? state.matchWinner === YOU
                     ? 'You win the match!'
                     : 'The table wins the match.'
-                  : state.potResults.some((r) => r.winners.includes(YOU))
-                    ? 'You win the pot.'
-                    : 'You lose the pot.'}
+                  : humanOut
+                    ? 'You busted out.'
+                    : state.potResults.some((r) => r.winners.includes(YOU))
+                      ? 'You win the pot.'
+                      : 'You lose the pot.'}
               </p>
               {state.matchWinner === YOU && <ScoreSubmit game="holdem" score={peakStack} />}
-              {state.matchWinner == null && (
+              {state.matchWinner == null && !humanOut && (
                 <Button size="lg" variant="gold" onClick={() => void dealNext('NEW_HAND', state.seats.length)} disabled={dealing}>
                   Next hand
                 </Button>
