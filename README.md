@@ -47,12 +47,16 @@ the card shows how many cards above / below / equal are still in the
 (genuinely depleting) deck, so you can count like the house does. Best
 streak for the session is tracked.
 
-**Texas Hold'em.** Heads-up, no-limit, against the house. Two hole cards each,
-five community cards revealed in stages (flop, turn, river), and real betting —
-check, call, raise to any size, or shove all-in, with the uncalled part of an
-oversized shove returned if your opponent can't match it. Best five of your two
-plus the board wins the pot; the small blind acts first before the flop and
-last on every street after. Bust your stack and the match is over.
+**Texas Hold'em.** No-limit, 2 to 6 at the table — solo against AI opponents
+(pick the table size; every seat but yours is AI) or online against real
+players. Two hole cards each, five community cards revealed in stages (flop,
+turn, river), and real betting — check, call, raise to any size, or shove
+all-in, with the uncalled part of an oversized shove returned if nobody can
+match it. Best five of your two plus the board wins the pot; if stacks are
+uneven and more than one player is all-in, the pot splits into side pots so
+each layer is only contested by whoever put in enough to reach it. The
+button rotates every hand; bust your stack and you're out, win or lose the
+match once only one player's still standing.
 
 **Crazy Eights.** Heads-up against an AI. Deal seven each; play a card matching
 the discard's suit or rank, or an eight (wild — you name the new suit). No legal
@@ -100,15 +104,20 @@ Origin check, and every game's score bounds are sized to what real play can
 actually produce, not round permissive numbers.
 
 **Multiplayer.** "👥 Friend" in the nav → host a room (a 6-character code from an
-unambiguous alphabet) or join one; two players, same link. The authoritative
-game state is a `rooms` row; the *same reducers* run inside the serverless
-function, which validates that the acting seat owns the move before applying it.
-Clients stay live by long-polling — a `GET` that hangs server-side up to ~24s and
-returns the instant the room's `version` bumps. War, Slapjack, Old Maid, Crazy
-Eights, Go Fish, and Trash are all playable in a room (High-Low and Hold'em
-stay solo). Solo-vs-AI is untouched — the reducers were generalised so each move
-carries an optional `side`, the AI move-picker just dispatches side `'ai'`, and a
-human in that seat sends the same actions.
+unambiguous alphabet) or join one. The authoritative game state is a `rooms`
+row; the *same reducers* run inside the serverless function, which validates
+that the acting seat owns the move before applying it. Clients stay live by
+long-polling — a `GET` that hangs server-side up to ~24s and returns the
+instant the room's `version` bumps. War, Slapjack, Old Maid, Crazy Eights, Go
+Fish, Trash, and Hold'em are all playable in a room (High-Low stays solo).
+Every game here is two-player except Hold'em, whose room the host can size
+from 2 to 6 seats — `SEAT_RANGE` in [`lib/multiplayer.ts`](src/lib/multiplayer.ts)
+is what a game declares to unlock that, not something the room plumbing
+assumes. Solo-vs-AI for the other six is untouched — their reducers carry an
+optional `side` per move, the AI move-picker just dispatches side `'ai'`, and
+a human in that seat sends the same actions. Hold'em's reducer instead
+addresses seats by index from the start, so the identical engine runs a
+2-seat solo table and a 6-seat online one.
 
 **Sound and haptics.** Deal, flip, slap, win, and lose each get a short cue,
 synthesised on the fly with the Web Audio API — oscillator tones and filtered
@@ -169,17 +178,23 @@ and free of any React or network concerns.
   category tier then tiebreak, correctly handling the A-2-3-4-5 wheel (whose
   "high card" for comparison is 5, not the ace).
 
-- **A genuine no-limit betting engine, not a fixed-bet-size toy**
-  ([`src/games/holdem/holdemReducer.ts`](src/games/holdem/holdemReducer.ts)).
+- **A genuine no-limit betting engine with side pots, not a fixed-bet-size
+  toy** ([`src/games/holdem/holdemReducer.ts`](src/games/holdem/holdemReducer.ts)).
   Runs on bet-*to* semantics (an action names the total you'll have put in
-  this street, not an increment), which makes multi-raise streets and
-  all-in-for-less — the shortfall refunded to the shover as an uncalled bet —
-  fall out for free instead of needing special-case code. All 5 community
-  cards are dealt into state at the start of the hand and only *revealed* a
-  few at a time by phase, so running an all-in out to showdown is just
-  advancing phase — no mid-hand card draws, no async handshake with the
-  container. The AI (`holdemLogic.ts`) is a deterministic hand-strength-vs-
-  pot-odds policy, same shape as every other game's AI here.
+  this street, not an increment) and addresses players by seat index rather
+  than a named role, so 2 to 6 seats share one engine — solo-vs-AI and an
+  online table both deal into the same reducer. Side pots fall out of one
+  idea: each seat's `contributed` (never reset mid-hand) is layered by
+  distinct contribution level at showdown, and a layer only one live seat
+  ever reached is simply awarded to them outright — which is exactly an
+  uncalled bet's refund, so that's not separate code, it's the same
+  side-pot math with one eligible seat. All 5 community cards are dealt into
+  state at the start of the hand and only *revealed* a few at a time by
+  phase, so running an all-in out to showdown is just advancing phase — no
+  mid-hand card draws, no async handshake with the container. The AI
+  (`holdemLogic.ts`) is a deterministic hand-strength-vs-pot-odds policy,
+  same shape as every other game's AI here, tightened slightly per extra
+  live opponent at the table.
 
 - **Blackjack is a multi-hand state machine**
   ([`src/games/blackjack/blackjackReducer.ts`](src/games/blackjack/blackjackReducer.ts)).
@@ -285,7 +300,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **239 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **250 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
   profanity filter, auth input rules, leaderboard validation/formatting, and
@@ -360,5 +375,8 @@ and login still work, there's just no real email in the loop.
 
 Things worth adding if this grew past a portfolio piece:
 
-- Side pots for Hold'em if it ever became more than heads-up (the betting
-  engine currently assumes exactly two players).
+- The other six multiplayer games are still fixed at 2 seats. Their rules
+  are genuinely head-to-head as designed (War splits one deck in half,
+  Slapjack alternates two flippers, ...), so going past 2 players would mean
+  redesigning each game's actual rules, not just widening a seat count the
+  way Hold'em's room does.
