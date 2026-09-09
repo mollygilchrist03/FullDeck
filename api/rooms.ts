@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { lt } from 'drizzle-orm'
 import { getDb, isDbConfigured } from '../db/client.js'
 import { rooms } from '../db/schema.js'
-import { isMpGame, makeRoomCode, sanitizePlayerName, type Seat } from '../src/lib/multiplayer.js'
+import { clampSeatCount, isMpGame, makeRoomCode, sanitizePlayerName, type Seat } from '../src/lib/multiplayer.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!isDbConfigured) {
@@ -34,7 +34,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await db.delete(rooms).where(lt(rooms.updatedAt, new Date(Date.now() - 6 * 3600_000)))
 
     const seatId = randomUUID()
-    const seats: Seat[] = [{ id: seatId, name }, null]
+    const size = clampSeatCount(game, body.size)
+    const seats: Seat[] = Array.from({ length: size }, (_, i) => (i === 0 ? { id: seatId, name } : null))
 
     // Retry a couple of times on the astronomically unlikely code collision.
     for (let attempt = 0; attempt < 5; attempt += 1) {

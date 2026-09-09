@@ -20,17 +20,25 @@ import {
 } from '../games/crazyeights/crazyEightsReducer.js'
 import { goFishReducer, initGoFish } from '../games/gofish/goFishReducer.js'
 import { trashReducer, initTrash } from '../games/trash/trashReducer.js'
+import { holdemReducer, type HoldemState } from '../games/holdem/holdemReducer.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyState = any
 type AnyAction = any
 
 export interface GameServer {
-  deal: (cards: Card[]) => AnyState
+  /** Deal a fresh game from a shuffled deck. `seatCount` is only meaningful
+   * to a game whose room can hold more than 2 seats (Hold'em) — every other
+   * entry here ignores it. */
+  deal: (cards: Card[], seatCount: number) => AnyState
   reduce: (state: AnyState, action: AnyAction) => AnyState
-  /** May `seat` (0 or 1) send `action` against `state`? */
+  /** May `seat` (a seat index) send `action` against `state`? */
   authorize: (state: AnyState, seat: number, action: AnyAction) => boolean
   isOver: (state: AnyState) => boolean
+  /** Deal the next hand into an in-progress match, carrying state forward
+   * (stacks, eliminations, ...) — only Hold'em needs this; every other game
+   * here is a single deal per room. */
+  dealNextHand?: (state: AnyState, cards: Card[]) => AnyState
 }
 
 /** Which reducer role a seat maps to in the player-vs-AI reducers. */
@@ -155,6 +163,31 @@ const trash: GameServer = {
   isOver: (s) => s.phase === 'gameover',
 }
 
+const holdem: GameServer = {
+  deal: (cards, seatCount) => {
+    const holes: Card[][] = []
+    for (let i = 0; i < seatCount; i += 1) holes.push([cards[i * 2], cards[i * 2 + 1]])
+    const board = cards.slice(seatCount * 2, seatCount * 2 + 5)
+    return holdemReducer(undefined as unknown as HoldemState, { type: 'START', seatCount, holes, board })
+  },
+  reduce: holdemReducer,
+  authorize: (s: HoldemState, seat, a) => {
+    if (a?.type === 'NEXT_HAND') return s.phase === 'handover' && s.matchWinner == null
+    if (s.phase === 'handover' || s.phase === 'showdown') return false
+    if (s.toAct !== seat || a?.seat !== seat) return false
+    if (a.type === 'BET') return typeof a.to === 'number'
+    return a.type === 'CHECK' || a.type === 'CALL' || a.type === 'FOLD'
+  },
+  isOver: (s: HoldemState) => s.matchWinner != null,
+  dealNextHand: (state: HoldemState, cards) => {
+    const liveCount = state.seats.filter((st) => !st.eliminated).length
+    const holes: Card[][] = []
+    for (let i = 0; i < liveCount; i += 1) holes.push([cards[i * 2], cards[i * 2 + 1]])
+    const board = cards.slice(liveCount * 2, liveCount * 2 + 5)
+    return holdemReducer(state, { type: 'NEW_HAND', holes, board })
+  },
+}
+
 export const GAME_SERVERS: Partial<Record<MpGameKey, GameServer>> = {
   war,
   slapjack,
@@ -162,6 +195,7 @@ export const GAME_SERVERS: Partial<Record<MpGameKey, GameServer>> = {
   'crazy-eights': crazyEights,
   'go-fish': goFish,
   trash,
+  holdem,
 }
 
 /** Fetch a fresh shuffled 52-card deck (server-side). */

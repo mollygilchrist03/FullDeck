@@ -1,6 +1,6 @@
 import type { GameKey } from './leaderboard.js'
 
-/** Games that support a two-player online room. */
+/** Games that support an online room. */
 export const MP_GAMES = [
   'war',
   'crazy-eights',
@@ -8,12 +8,32 @@ export const MP_GAMES = [
   'go-fish',
   'trash',
   'old-maid',
+  'holdem',
 ] as const satisfies readonly GameKey[]
 
 export type MpGameKey = (typeof MP_GAMES)[number]
 
 export function isMpGame(value: unknown): value is MpGameKey {
   return typeof value === 'string' && (MP_GAMES as readonly string[]).includes(value)
+}
+
+/** How many seats a game's room can hold. Every game here plays exactly two
+ * except Hold'em, whose rules (and betting engine) genuinely scale to a
+ * table — the host picks a size in that range when creating the room. */
+export const SEAT_RANGE: Record<MpGameKey, { min: number; max: number }> = {
+  war: { min: 2, max: 2 },
+  'crazy-eights': { min: 2, max: 2 },
+  slapjack: { min: 2, max: 2 },
+  'go-fish': { min: 2, max: 2 },
+  trash: { min: 2, max: 2 },
+  'old-maid': { min: 2, max: 2 },
+  holdem: { min: 2, max: 6 },
+}
+
+export function clampSeatCount(game: MpGameKey, size: unknown): number {
+  const { min, max } = SEAT_RANGE[game]
+  const n = typeof size === 'number' && Number.isInteger(size) ? size : min
+  return Math.min(max, Math.max(min, n))
 }
 
 /** Unambiguous code alphabet — no 0/O/1/I/L. */

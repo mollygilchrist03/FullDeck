@@ -122,8 +122,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.status(403).json({ error: 'Only the host can do that.' })
           return
         }
-        if (seats.some((s) => s === null)) {
-          res.status(409).json({ error: 'Waiting for both players.' })
+        const openSeats = seats.filter((s) => s === null).length
+        if (openSeats > 0) {
+          res.status(409).json({ error: `Waiting for ${openSeats} more player${openSeats === 1 ? '' : 's'}.` })
           return
         }
         const server = GAME_SERVERS[room.game as MpGameKey]
@@ -131,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.status(400).json({ error: 'That game has no server implementation yet.' })
           return
         }
-        const state = server.deal(await freshDeck())
+        const state = server.deal(await freshDeck(), seats.length)
         const [updated] = await db
           .update(rooms)
           .set({
@@ -143,6 +144,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .where(and(eq(rooms.code, code), eq(rooms.version, room.version)))
           .returning()
         res.status(200).json(view(updated ?? room, seatId))
+        return
+      }
+
+      if (op === 'next-hand') {
+        if (room.phase !== 'playing') {
+          res.status(409).json({ error: 'The game is not in progress.' })
+          return
+        }
+        const server = GAME_SERVERS[room.game as MpGameKey]
+        if (!server?.dealNextHand) {
+          res.status(400).json({ error: 'That game has no next hand to deal.' })
+          return
+        }
+        if (!server.authorize(room.state, seatIndex, { type: 'NEXT_HAND' })) {
+          res.status(403).json({ error: 'The current hand is still in progress.' })
+          return
+        }
+        const next = server.dealNextHand(room.state, await freshDeck())
+        const [updated] = await db
+          .update(rooms)
+          .set({
+            state: next,
+            phase: server.isOver(next) ? 'done' : 'playing',
+            version: room.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(rooms.code, code), eq(rooms.version, room.version)))
+          .returning()
+        if (!updated) {
+          const fresh = await loadRoom(code)
+          res.status(409).json({ error: 'Out of sync.', room: fresh ? view(fresh, seatId) : null })
+          return
+        }
+        res.status(200).json(view(updated, seatId))
         return
       }
 

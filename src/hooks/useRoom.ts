@@ -34,9 +34,11 @@ async function postJson(url: string, body: unknown) {
   return data
 }
 
-/** Create a room. Returns the join code; the seat id is stashed for reconnects. */
-export async function createRoom(game: MpGameKey, name: string): Promise<string> {
-  const data = await postJson('/api/rooms', { game, name })
+/** Create a room. Returns the join code; the seat id is stashed for reconnects.
+ * `size` only matters for a game whose room can hold more than 2 seats — see
+ * `SEAT_RANGE` in `lib/multiplayer.ts`. */
+export async function createRoom(game: MpGameKey, name: string, size?: number): Promise<string> {
+  const data = await postJson('/api/rooms', { game, name, size })
   saveSeatId(data.code as string, data.seatId as string)
   return data.code as string
 }
@@ -55,6 +57,8 @@ interface UseRoom {
   send: (action: unknown) => Promise<void>
   start: () => Promise<void>
   rematch: () => Promise<void>
+  /** Deal the next hand within the same match (Hold'em only). */
+  nextHand: () => Promise<void>
 }
 
 /** Connect to a room and keep its state live via long-polling. */
@@ -135,5 +139,6 @@ export function useRoom(code: string): UseRoom {
     send: (action) => op({ op: 'action', action }),
     start: () => op({ op: 'start' }),
     rematch: () => op({ op: 'rematch' }),
+    nextHand: () => op({ op: 'next-hand' }),
   }
 }
