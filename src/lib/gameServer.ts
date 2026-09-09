@@ -101,31 +101,27 @@ const oldMaid: GameServer = {
 }
 
 const crazyEights: GameServer = {
-  deal: (c) => {
-    const playerHand = c.slice(0, CE_HAND)
-    const aiHand = c.slice(CE_HAND, CE_HAND * 2)
-    const rest = c.slice(CE_HAND * 2)
+  deal: (c, seatCount) => {
+    const hands: Card[][] = []
+    for (let i = 0; i < seatCount; i += 1) hands.push(c.slice(i * CE_HAND, (i + 1) * CE_HAND))
+    const rest = c.slice(seatCount * CE_HAND)
     const starterIdx = Math.max(0, rest.findIndex((x) => x.rank !== '8'))
     const discard = [rest[starterIdx]]
     const stock = rest.filter((_, i) => i !== starterIdx)
-    return crazyEightsReducer(initCrazyEights(), {
+    return crazyEightsReducer(initCrazyEights(seatCount), {
       type: 'START',
       stock,
       discard,
-      playerHand,
-      aiHand,
+      hands,
       activeSuit: discard[0].suit,
     })
   },
   reduce: crazyEightsReducer,
   authorize: (s, seat, a) => {
-    if (s.phase === 'gameover') return false
-    const want = role(seat)
-    const side = a?.side ?? 'player'
-    if (side !== want) return false
-    if (a?.type === 'CHOOSE_SUIT') return s.phase === 'awaitSuit' && s.wildSide === want
+    if (s.phase === 'gameover' || a?.seat !== seat) return false
+    if (a?.type === 'CHOOSE_SUIT') return s.phase === 'awaitSuit' && s.wildSeat === seat
     if (a?.type === 'PLAY' || a?.type === 'DRAW' || a?.type === 'PASS') {
-      return s.phase === (want === 'player' ? 'playerTurn' : 'aiTurn')
+      return s.phase === 'turn' && s.turn === seat
     }
     return false
   },

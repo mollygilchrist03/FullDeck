@@ -5,7 +5,7 @@ import {
   crazyEightsReducer,
   HAND_SIZE,
   initCrazyEights,
-  playerHasMove,
+  seatHasMove,
   topCard,
   type CrazyEightsState,
 } from './crazyEightsReducer'
@@ -53,40 +53,44 @@ describe('chooseAiPlay', () => {
   })
 })
 
+/** Seat 0 = "you", seat 1 = "the AI" unless overridden. */
 const setup = (over: Partial<CrazyEightsState> = {}): CrazyEightsState => ({
-  ...crazyEightsReducer(initCrazyEights(), {
+  ...crazyEightsReducer(initCrazyEights(2), {
     type: 'START',
     stock: [card('2', 'SPADES'), card('3', 'SPADES')],
     discard: [card('7', 'HEARTS')],
-    playerHand: [card('7', 'CLUBS'), card('8', 'DIAMONDS'), card('4', 'HEARTS')],
-    aiHand: [card('9', 'HEARTS'), card('2', 'CLUBS')],
+    hands: [
+      [card('7', 'CLUBS'), card('8', 'DIAMONDS'), card('4', 'HEARTS')],
+      [card('9', 'HEARTS'), card('2', 'CLUBS')],
+    ],
     activeSuit: 'HEARTS',
   }),
   ...over,
 })
 
 describe('crazyEightsReducer', () => {
-  it('START deals into the player turn', () => {
+  it('START deals into the first seat\'s turn', () => {
     const s = setup()
-    expect(s.phase).toBe('playerTurn')
+    expect(s.phase).toBe('turn')
+    expect(s.turn).toBe(0)
     expect(topCard(s).rank).toBe('7')
     expect(s.activeSuit).toBe('HEARTS')
   })
 
   it('rejects an unplayable card', () => {
-    const s = setup()
     // index 0 is 7C — plays on rank. index 2 is 4H — plays on suit. Make an illegal one:
-    const illegal = setup({ playerHand: [card('5', 'CLUBS'), card('4', 'HEARTS')] })
+    const illegal = setup({ hands: [[card('5', 'CLUBS'), card('4', 'HEARTS')], []] })
     expect(crazyEightsReducer(illegal, { type: 'PLAY', index: 0 })).toBe(illegal)
     // sanity: a legal play does change state
+    const s = setup()
     expect(crazyEightsReducer(s, { type: 'PLAY', index: 0 })).not.toBe(s)
   })
 
-  it('a normal play sets the active suit and hands off to the AI', () => {
+  it('a normal play sets the active suit and hands off to the next seat', () => {
     const s = crazyEightsReducer(setup(), { type: 'PLAY', index: 0 }) // 7C
     expect(s.activeSuit).toBe('CLUBS')
-    expect(s.phase).toBe('aiTurn')
-    expect(s.playerHand).toHaveLength(2)
+    expect(s.turn).toBe(1)
+    expect(s.hands[0]).toHaveLength(2)
     expect(topCard(s).rank).toBe('7')
     expect(topCard(s).suit).toBe('CLUBS')
   })
@@ -96,19 +100,19 @@ describe('crazyEightsReducer', () => {
     expect(s.phase).toBe('awaitSuit')
     s = crazyEightsReducer(s, { type: 'CHOOSE_SUIT', suit: 'SPADES' })
     expect(s.activeSuit).toBe('SPADES')
-    expect(s.phase).toBe('aiTurn')
+    expect(s.turn).toBe(1)
   })
 
   it('going out on the last card wins immediately', () => {
-    const s = crazyEightsReducer(setup({ playerHand: [card('4', 'HEARTS')] }), {
+    const s = crazyEightsReducer(setup({ hands: [[card('4', 'HEARTS')], [card('9', 'HEARTS')]] }), {
       type: 'PLAY',
       index: 0,
     })
     expect(s.phase).toBe('gameover')
-    expect(s.winner).toBe('player')
+    expect(s.winner).toBe(0)
   })
 
-  it('ignores DRAW and PASS while the player has a legal move', () => {
+  it('ignores DRAW and PASS while the seat has a legal move', () => {
     const s = setup() // hand can play 7C, 8D, or 4H
     expect(crazyEightsReducer(s, { type: 'DRAW' })).toBe(s)
     expect(crazyEightsReducer(s, { type: 'PASS' })).toBe(s)
@@ -116,7 +120,7 @@ describe('crazyEightsReducer', () => {
 
   it('DRAW works only with no legal move, and PASS only when the deck is dead', () => {
     const stuck = setup({
-      playerHand: [card('4', 'CLUBS'), card('9', 'SPADES')],
+      hands: [[card('4', 'CLUBS'), card('9', 'SPADES')], [card('9', 'HEARTS'), card('2', 'CLUBS')]],
       activeSuit: 'HEARTS',
       stock: [card('5', 'DIAMONDS')],
       discard: [card('7', 'HEARTS')],
@@ -124,128 +128,125 @@ describe('crazyEightsReducer', () => {
     // Stock has a card, so you must draw, not pass.
     expect(crazyEightsReducer(stuck, { type: 'PASS' })).toBe(stuck)
     const drawn = crazyEightsReducer(stuck, { type: 'DRAW' })
-    expect(drawn.playerHand).toHaveLength(3)
+    expect(drawn.hands[0]).toHaveLength(3)
 
     // Now nothing left to draw -> pass is allowed.
     const dead = { ...stuck, stock: [] }
     expect(crazyEightsReducer(dead, { type: 'DRAW' })).toBe(dead)
     const passed = crazyEightsReducer(dead, { type: 'PASS' })
-    expect(passed.phase).toBe('aiTurn')
+    expect(passed.turn).toBe(1)
     expect(passed.passStreak).toBe(1)
   })
 
   it('AI_STEP plays a legal card and returns the turn', () => {
-    const s = crazyEightsReducer(setup({ phase: 'aiTurn' }), { type: 'AI_STEP' })
-    // AI hand 9H / 2C against 7H active HEARTS -> plays 9H
+    const s = crazyEightsReducer(setup({ turn: 1 }), { type: 'AI_STEP' })
+    // seat 1's hand 9H / 2C against 7H active HEARTS -> plays 9H
     expect(topCard(s).rank).toBe('9')
-    expect(s.phase).toBe('playerTurn')
-    expect(s.aiHand).toHaveLength(1)
+    expect(s.turn).toBe(0)
+    expect(s.hands[1]).toHaveLength(1)
   })
 
   it('AI_STEP draws when it has no move', () => {
     const stuck = setup({
-      phase: 'aiTurn',
-      aiHand: [card('4', 'CLUBS'), card('9', 'SPADES')],
+      turn: 1,
+      hands: [[card('7', 'CLUBS')], [card('4', 'CLUBS'), card('9', 'SPADES')]],
       activeSuit: 'HEARTS',
       stock: [card('5', 'DIAMONDS')],
     })
     const s = crazyEightsReducer(stuck, { type: 'AI_STEP' })
-    expect(s.aiHand).toHaveLength(3)
-    expect(s.phase).toBe('aiTurn')
+    expect(s.hands[1]).toHaveLength(3)
+    expect(s.turn).toBe(1)
   })
 
   it('AI_STEP passes when the deck is exhausted and it cannot move', () => {
     const stuck = setup({
-      phase: 'aiTurn',
-      aiHand: [card('4', 'CLUBS'), card('9', 'SPADES')],
+      turn: 1,
+      hands: [[card('7', 'CLUBS')], [card('4', 'CLUBS'), card('9', 'SPADES')]],
       activeSuit: 'HEARTS',
       stock: [],
       discard: [card('7', 'HEARTS')],
     })
     const s = crazyEightsReducer(stuck, { type: 'AI_STEP' })
-    expect(s.phase).toBe('playerTurn')
+    expect(s.turn).toBe(0)
     expect(s.passStreak).toBe(1)
   })
 
-  it('ends in a stalemate when both sides pass with a dead deck', () => {
+  it('ends in a stalemate when every seat passes with a dead deck', () => {
     // Neither can move, nothing to draw.
     let s = setup({
-      phase: 'playerTurn',
-      playerHand: [card('4', 'CLUBS')],
-      aiHand: [card('9', 'SPADES'), card('10', 'SPADES')],
+      turn: 0,
+      hands: [[card('4', 'CLUBS')], [card('9', 'SPADES'), card('10', 'SPADES')]],
       activeSuit: 'HEARTS',
       stock: [],
       discard: [card('7', 'HEARTS')],
     })
-    s = crazyEightsReducer(s, { type: 'PASS' }) // player pass -> aiTurn, passStreak 1
-    expect(s.phase).toBe('aiTurn')
-    s = crazyEightsReducer(s, { type: 'AI_STEP' }) // AI pass -> passStreak 2 -> gameover
+    s = crazyEightsReducer(s, { type: 'PASS' }) // seat 0 passes -> seat 1's turn, passStreak 1
+    expect(s.turn).toBe(1)
+    s = crazyEightsReducer(s, { type: 'AI_STEP' }) // seat 1 passes -> passStreak 2 (== seatCount) -> gameover
     expect(s.phase).toBe('gameover')
     expect(s.stalemate).toBe(true)
-    expect(s.winner).toBe('player') // fewer cards (1 vs 2)
+    expect(s.winner).toBe(0) // fewer cards (1 vs 2)
   })
 
   it('a successful draw between passes clears the deadlock counter', () => {
     let s = setup({
-      phase: 'aiTurn',
-      aiHand: [card('4', 'CLUBS')],
+      turn: 1,
+      hands: [[card('7', 'CLUBS'), card('8', 'DIAMONDS'), card('4', 'HEARTS')], [card('4', 'CLUBS')]],
       activeSuit: 'HEARTS',
       stock: [],
       discard: [card('7', 'HEARTS'), card('2', 'CLUBS')],
       passStreak: 1,
     })
-    // Stock is empty but the discard recycles, so the AI draws instead of passing.
+    // Stock is empty but the discard recycles, so seat 1 draws instead of passing.
     s = crazyEightsReducer(s, { type: 'AI_STEP' })
     expect(s.passStreak).toBe(0)
   })
 
-  it('AI going out ends the game', () => {
+  it('the AI going out ends the game', () => {
     const s = crazyEightsReducer(
-      setup({ phase: 'aiTurn', aiHand: [card('9', 'HEARTS')] }),
+      setup({ turn: 1, hands: [[card('7', 'CLUBS'), card('8', 'DIAMONDS'), card('4', 'HEARTS')], [card('9', 'HEARTS')]] }),
       { type: 'AI_STEP' },
     )
     expect(s.phase).toBe('gameover')
-    expect(s.winner).toBe('ai')
+    expect(s.winner).toBe(1)
   })
 
   it('recycles the discard pile when the stock runs dry', () => {
     const dry = setup({
       stock: [],
       discard: [card('2', 'HEARTS'), card('3', 'CLUBS'), card('7', 'HEARTS')],
-      playerHand: [card('9', 'SPADES')],
+      hands: [[card('9', 'SPADES')], [card('9', 'HEARTS'), card('2', 'CLUBS')]],
       activeSuit: 'HEARTS',
     })
     const s = crazyEightsReducer(dry, { type: 'DRAW' })
-    expect(s.playerHand).toHaveLength(2) // drew one
+    expect(s.hands[0]).toHaveLength(2) // drew one
     expect(s.discard).toHaveLength(1) // recycled down to the top card
     expect(s.stock.length).toBe(1) // 2 recycled, 1 drawn
   })
 
-  it('every deal plays to a finish — no stuck state (fuzz, 300 random games)', () => {
+  it('every 2-seat deal plays to a finish — no stuck state (fuzz, 300 random games)', () => {
     for (let game = 0; game < 300; game += 1) {
       const d = shuffledDeck()
-      const playerHand = d.slice(0, HAND_SIZE)
-      const aiHand = d.slice(HAND_SIZE, HAND_SIZE * 2)
+      const hands = [d.slice(0, HAND_SIZE), d.slice(HAND_SIZE, HAND_SIZE * 2)]
       const rest = d.slice(HAND_SIZE * 2)
       const starterIdx = Math.max(0, rest.findIndex((c) => c.rank !== '8'))
-      let s = crazyEightsReducer(initCrazyEights(), {
+      let s = crazyEightsReducer(initCrazyEights(2), {
         type: 'START',
         stock: rest.filter((_, i) => i !== starterIdx),
         discard: [rest[starterIdx]],
-        playerHand,
-        aiHand,
+        hands,
         activeSuit: rest[starterIdx].suit,
       })
       let steps = 0
       while (s.phase !== 'gameover' && steps < 3000) {
         steps += 1
-        if (s.phase === 'aiTurn' || (s.phase === 'awaitSuit' && s.wildSide === 'ai')) {
+        if (s.turn === 1 || (s.phase === 'awaitSuit' && s.wildSeat === 1)) {
           s = crazyEightsReducer(s, { type: 'AI_STEP' })
         } else if (s.phase === 'awaitSuit') {
           s = crazyEightsReducer(s, { type: 'CHOOSE_SUIT', suit: SUITS[game % 4] })
-        } else if (playerHasMove(s)) {
-          const legal = playableCards(s.playerHand, topCard(s), s.activeSuit)
-          const idx = s.playerHand.findIndex((c) => c.code === legal[0].code)
+        } else if (seatHasMove(s, 0)) {
+          const legal = playableCards(s.hands[0], topCard(s), s.activeSuit)
+          const idx = s.hands[0].findIndex((c) => c.code === legal[0].code)
           s = crazyEightsReducer(s, { type: 'PLAY', index: idx })
         } else if (canDraw(s)) {
           s = crazyEightsReducer(s, { type: 'DRAW' })
@@ -255,6 +256,43 @@ describe('crazyEightsReducer', () => {
       }
       expect(s.phase).toBe('gameover')
       expect(s.winner).not.toBeNull()
+    }
+  })
+
+  it('every 6-seat deal plays to a finish — no stuck state (fuzz, 100 random games)', () => {
+    const SEATS = 6
+    for (let game = 0; game < 100; game += 1) {
+      const d = shuffledDeck()
+      const hands: (typeof d)[] = []
+      for (let i = 0; i < SEATS; i += 1) hands.push(d.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE))
+      const rest = d.slice(SEATS * HAND_SIZE)
+      const starterIdx = Math.max(0, rest.findIndex((c) => c.rank !== '8'))
+      let s = crazyEightsReducer(initCrazyEights(SEATS), {
+        type: 'START',
+        stock: rest.filter((_, i) => i !== starterIdx),
+        discard: [rest[starterIdx]],
+        hands,
+        activeSuit: rest[starterIdx].suit,
+      })
+      let steps = 0
+      while (s.phase !== 'gameover' && steps < 6000) {
+        steps += 1
+        if (s.phase === 'awaitSuit') {
+          s = crazyEightsReducer(s, { type: 'CHOOSE_SUIT', suit: SUITS[game % 4], seat: s.wildSeat! })
+        } else if (seatHasMove(s, s.turn)) {
+          const legal = playableCards(s.hands[s.turn], topCard(s), s.activeSuit)
+          const idx = s.hands[s.turn].findIndex((c) => c.code === legal[0].code)
+          s = crazyEightsReducer(s, { type: 'PLAY', index: idx, seat: s.turn })
+        } else if (canDraw(s)) {
+          s = crazyEightsReducer(s, { type: 'DRAW', seat: s.turn })
+        } else {
+          s = crazyEightsReducer(s, { type: 'PASS', seat: s.turn })
+        }
+      }
+      expect(s.phase).toBe('gameover')
+      expect(s.winner).not.toBeNull()
+      const totalCards = s.hands.reduce((sum, h) => sum + h.length, 0) + s.stock.length + s.discard.length
+      expect(totalCards).toBe(52)
     }
   })
 })

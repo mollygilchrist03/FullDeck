@@ -4,7 +4,7 @@ import type { Suit } from '../../types/card.js'
 import { isPlayable } from '../crazyeights/crazyEightsLogic.js'
 import {
   canDraw,
-  sideHasMove,
+  seatHasMove,
   topCard,
   type CrazyEightsState,
 } from '../crazyeights/crazyEightsReducer.js'
@@ -16,34 +16,38 @@ const isRed = (s: Suit) => s === 'HEARTS' || s === 'DIAMONDS'
 
 export function CrazyEightsRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as CrazyEightsState
-  const seat = view.youSeat ?? 0
-  const spectator = view.youSeat === null
-  const side = seat === 0 ? 'player' : 'ai'
-  const myHand = side === 'player' ? s.playerHand : s.aiHand
-  const theirHand = side === 'player' ? s.aiHand : s.playerHand
-  const myPhase = side === 'player' ? 'playerTurn' : 'aiTurn'
+  const seat = view.youSeat
+  const spectator = seat === null
+  const myHand = seat !== null ? s.hands[seat] : []
   const top = s.discard.length ? topCard(s) : null
   const over = s.phase === 'gameover'
-  const myTurn = !spectator && s.phase === myPhase
-  const iAwaitSuit = !spectator && s.phase === 'awaitSuit' && s.wildSide === side
+  const myTurn = !spectator && s.phase === 'turn' && s.turn === seat
+  const iAwaitSuit = !spectator && s.phase === 'awaitSuit' && s.wildSeat === seat
   const legal = (i: number) => (top ? isPlayable(myHand[i], top, s.activeSuit) : false)
-  const hasMove = myTurn && sideHasMove(s, side)
+  const hasMove = myTurn && seat !== null && seatHasMove(s, seat)
   const mustDraw = myTurn && !hasMove && canDraw(s)
   const mustPass = myTurn && !hasMove && !canDraw(s)
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="flex flex-col items-center gap-1">
-        <p className="text-xs uppercase tracking-widest text-gold/80">
-          Opponent — {theirHand.length} card{theirHand.length === 1 ? '' : 's'}
-        </p>
-        <div className="flex">
-          {theirHand.slice(0, 14).map((_, i) => (
-            <div key={i} className="-ml-6 w-9 first:ml-0">
-              <Card faceDown />
+      <div className="flex flex-wrap justify-center gap-4">
+        {s.hands.map((hand, i) => {
+          if (i === seat) return null
+          return (
+            <div key={i} className="flex flex-col items-center gap-1">
+              <p className="text-xs uppercase tracking-widest text-gold/80">
+                Seat {i + 1} — {hand.length} card{hand.length === 1 ? '' : 's'}
+              </p>
+              <div className="flex">
+                {hand.slice(0, 12).map((_, ci) => (
+                  <div key={ci} className="-ml-6 w-9 first:ml-0">
+                    <Card faceDown />
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
 
       {top && (
@@ -64,13 +68,13 @@ export function CrazyEightsRoom({ view, send, sending }: MpBoardProps) {
 
       <p className="min-h-5 text-center text-sm text-card/75" role="status" aria-live="polite">
         {over
-          ? s.winner === side
+          ? s.winner === seat
             ? s.stalemate
               ? 'Deadlock — you had fewer cards. You win.'
               : 'You went out — you win!'
             : s.stalemate
-              ? 'Deadlock — your opponent had fewer cards. You lose.'
-              : 'Your opponent went out. You lose.'
+              ? `Deadlock — Seat ${(s.winner ?? 0) + 1} had fewer cards.`
+              : `Seat ${(s.winner ?? 0) + 1} went out.`
           : s.log[s.log.length - 1]}
       </p>
 
@@ -81,7 +85,7 @@ export function CrazyEightsRoom({ view, send, sending }: MpBoardProps) {
               key={su}
               type="button"
               disabled={sending}
-              onClick={() => send({ type: 'CHOOSE_SUIT', suit: su, side })}
+              onClick={() => send({ type: 'CHOOSE_SUIT', suit: su, seat })}
               className={`h-12 w-12 rounded-lg border border-gold/50 bg-felt text-2xl ${
                 isRed(su) ? 'text-casino' : 'text-card'
               } hover:border-gold disabled:opacity-60`}
@@ -99,7 +103,7 @@ export function CrazyEightsRoom({ view, send, sending }: MpBoardProps) {
             <Card
               card={c}
               faceDown={false}
-              onClick={myTurn && legal(i) ? () => send({ type: 'PLAY', index: i, side }) : undefined}
+              onClick={myTurn && legal(i) ? () => send({ type: 'PLAY', index: i, seat }) : undefined}
               disabled={!myTurn || !legal(i) || sending}
               className={myTurn && legal(i) ? 'ring-2 ring-gold' : 'opacity-55'}
             />
@@ -112,14 +116,14 @@ export function CrazyEightsRoom({ view, send, sending }: MpBoardProps) {
           <div className="flex gap-3">
             <Button
               variant="ghost"
-              onClick={() => send({ type: 'DRAW', side })}
+              onClick={() => send({ type: 'DRAW', seat })}
               disabled={!mustDraw || sending}
             >
               Draw
             </Button>
             <Button
               variant="accent"
-              onClick={() => send({ type: 'PASS', side })}
+              onClick={() => send({ type: 'PASS', seat })}
               disabled={!mustPass || sending}
             >
               Pass
@@ -135,7 +139,7 @@ export function CrazyEightsRoom({ view, send, sending }: MpBoardProps) {
         </div>
       )}
       {!myTurn && !over && !spectator && (
-        <p className="text-xs text-card/50">Opponent&apos;s turn…</p>
+        <p className="text-xs text-card/50">Waiting on the table…</p>
       )}
     </div>
   )

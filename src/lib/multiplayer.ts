@@ -22,7 +22,7 @@ export function isMpGame(value: unknown): value is MpGameKey {
  * table — the host picks a size in that range when creating the room. */
 export const SEAT_RANGE: Record<MpGameKey, { min: number; max: number }> = {
   war: { min: 2, max: 2 },
-  'crazy-eights': { min: 2, max: 2 },
+  'crazy-eights': { min: 2, max: 6 },
   slapjack: { min: 2, max: 6 },
   'go-fish': { min: 2, max: 2 },
   trash: { min: 2, max: 2 },

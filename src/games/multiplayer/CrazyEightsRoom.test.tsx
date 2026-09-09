@@ -20,43 +20,40 @@ const view = (state: unknown, over: Partial<RoomView> = {}): RoomView => ({
 })
 
 // My turn: a 5 that matches the top card's rank is playable, a 9 is not.
-const playable = crazyEightsReducer(initCrazyEights(), {
+const playable = crazyEightsReducer(initCrazyEights(2), {
   type: 'START',
   stock: [card('2', 'CLUBS')],
   discard: [card('5', 'HEARTS')],
-  playerHand: [card('5', 'SPADES'), card('9', 'CLUBS')],
-  aiHand: [card('3', 'DIAMONDS')],
+  hands: [[card('5', 'SPADES'), card('9', 'CLUBS')], [card('3', 'DIAMONDS')]],
   activeSuit: 'HEARTS',
 })
 
 // My turn, nothing playable, stock non-empty: must draw.
-const mustDraw = crazyEightsReducer(initCrazyEights(), {
+const mustDraw = crazyEightsReducer(initCrazyEights(2), {
   type: 'START',
   stock: [card('2', 'CLUBS')],
   discard: [card('5', 'HEARTS')],
-  playerHand: [card('9', 'CLUBS')],
-  aiHand: [card('3', 'DIAMONDS')],
+  hands: [[card('9', 'CLUBS')], [card('3', 'DIAMONDS')]],
   activeSuit: 'HEARTS',
 })
 
 // I've just played an eight and need to name the next suit.
-const dealt8 = crazyEightsReducer(initCrazyEights(), {
+const dealt8 = crazyEightsReducer(initCrazyEights(2), {
   type: 'START',
   stock: [card('2', 'CLUBS')],
   discard: [card('5', 'HEARTS')],
   // A second card so playing the eight doesn't empty the hand and end the game.
-  playerHand: [card('8', 'SPADES'), card('4', 'CLUBS')],
-  aiHand: [card('3', 'DIAMONDS')],
+  hands: [[card('8', 'SPADES'), card('4', 'CLUBS')], [card('3', 'DIAMONDS')]],
   activeSuit: 'HEARTS',
 })
-const awaitSuit = crazyEightsReducer(dealt8, { type: 'PLAY', index: 0, side: 'player' })
+const awaitSuit = crazyEightsReducer(dealt8, { type: 'PLAY', index: 0, seat: 0 })
 
 describe('<CrazyEightsRoom>', () => {
-  it('plays a legal card, tagged with my side', async () => {
+  it('plays a legal card, tagged with my seat', async () => {
     const send = vi.fn()
     render(<CrazyEightsRoom view={view(playable)} send={send} onRematch={vi.fn()} sending={false} />)
     await userEvent.click(screen.getByRole('button', { name: '5 of spades' }))
-    expect(send).toHaveBeenCalledWith({ type: 'PLAY', index: 0, side: 'player' })
+    expect(send).toHaveBeenCalledWith({ type: 'PLAY', index: 0, seat: 0 })
   })
 
   it('an unplayable card renders inert, with no click handler at all', () => {
@@ -84,10 +81,31 @@ describe('<CrazyEightsRoom>', () => {
     expect(screen.getByRole('button', { name: 'Draw' })).toBeDisabled()
   })
 
-  it('choosing a suit sends CHOOSE_SUIT tagged with my side', async () => {
+  it('choosing a suit sends CHOOSE_SUIT tagged with my seat', async () => {
     const send = vi.fn()
     render(<CrazyEightsRoom view={view(awaitSuit)} send={send} onRematch={vi.fn()} sending={false} />)
     await userEvent.click(screen.getByRole('button', { name: 'SPADES' }))
-    expect(send).toHaveBeenCalledWith({ type: 'CHOOSE_SUIT', suit: 'SPADES', side: 'player' })
+    expect(send).toHaveBeenCalledWith({ type: 'CHOOSE_SUIT', suit: 'SPADES', seat: 0 })
+  })
+
+  it('renders every other seat in a 4-player room', () => {
+    const fourSeat = crazyEightsReducer(initCrazyEights(4), {
+      type: 'START',
+      stock: [card('2', 'CLUBS')],
+      discard: [card('5', 'HEARTS')],
+      hands: [[card('5', 'SPADES')], [card('3', 'DIAMONDS')], [card('4', 'CLUBS')], [card('6', 'HEARTS')]],
+      activeSuit: 'HEARTS',
+    })
+    render(
+      <CrazyEightsRoom
+        view={view(fourSeat, { seats: ['Me', 'A', 'B', 'C'] })}
+        send={vi.fn()}
+        onRematch={vi.fn()}
+        sending={false}
+      />,
+    )
+    expect(screen.getByText(/Seat 2/)).toBeInTheDocument()
+    expect(screen.getByText(/Seat 3/)).toBeInTheDocument()
+    expect(screen.getByText(/Seat 4/)).toBeInTheDocument()
   })
 })

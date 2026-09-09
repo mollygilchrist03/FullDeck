@@ -112,18 +112,22 @@ instant the room's `version` bumps. War, Slapjack, Old Maid, Crazy Eights, Go
 Fish, Trash, and Hold'em are all playable in a room (High-Low stays solo).
 Room size is a per-game declaration — `SEAT_RANGE` in
 [`lib/multiplayer.ts`](src/lib/multiplayer.ts) — not something the room
-plumbing assumes: War, Old Maid, Crazy Eights, Go Fish, and Trash are
-two-player only (their actual rules are head-to-head, e.g. War splitting one
-deck exactly in half), while Slapjack and Hold'em both scale to a 2-6 seat
-table, because their core mechanics already generalize — a slap is a race
-against shared table state, not a pairwise comparison, and Hold'em's engine
-already addresses players by seat rather than a named role. Solo-vs-AI for
-War/Old Maid/Crazy Eights/Go Fish/Trash is untouched — their reducers carry
-an optional `side` per move, the AI move-picker just dispatches side `'ai'`,
-and a human in that seat sends the same actions. Slapjack and Hold'em
-instead address seats by index from the start, so the identical engine runs
-a 2-seat solo table and a bigger online one; solo Slapjack still deals
-exactly 2 piles (its AI opponent is single-player only, not multi-seat).
+plumbing assumes: War, Old Maid, Go Fish, and Trash are two-player only
+(their actual rules are head-to-head — War splits one deck exactly in
+half; Old Maid's "draw from the dealer" and Go Fish's "ask the opponent"
+have nobody else to name as a target), while Slapjack, Crazy Eights, and
+Hold'em all scale to a 2-6 seat table, because their core mechanics
+already generalize — a slap is a race against shared table state rather
+than a pairwise comparison, Crazy Eights' turn order and "two passes ends
+it" rule are just a rotation and a full-lap count once seats are an array
+instead of a named pair, and Hold'em's engine already addresses players
+by seat rather than a role. Solo-vs-AI for War/Old Maid/Go Fish/Trash is
+untouched — their reducers carry an optional `side` per move, the AI
+move-picker just dispatches side `'ai'`, and a human in that seat sends
+the same actions. Slapjack, Crazy Eights, and Hold'em instead address
+seats by index from the start, so the identical engine runs a 2-seat solo
+table and a bigger online one; solo Slapjack and Crazy Eights still deal
+exactly 2 hands (their AI opponent is single-player only, not multi-seat).
 
 **Sound and haptics.** Deal, flip, slap, win, and lose each get a short cue,
 synthesised on the fly with the Web Audio API — oscillator tones and filtered
@@ -234,10 +238,15 @@ and free of any React or network concerns.
   (`isPlayable`: eight, or suit, or rank — against the *active* suit, which an
   eight can change) and the opponent's policy (`chooseAiPlay`: play a matching
   non-eight, save eights, otherwise play an eight naming your strongest suit) are
-  pure. The reducer runs `playerTurn → awaitSuit → aiTurn → …` and the AI plays
-  one `AI_STEP` at a time on a timer, so drawing several cards before a play is
+  pure and hand-local, so the same policy drives one AI seat in solo play with
+  no changes. `hands: Card[][]` is seat-indexed rather than a named pair, so
+  `turn: number` just increments modulo the seat count and "two passes ends a
+  stalemate" generalizes to "a full lap of passes with nothing played or drawn
+  in between" — the same mechanism the 2-seat solo game already used, just
+  parameterized by table size instead of hardcoded to 2. The AI plays one
+  `AI_STEP` at a time on a timer, so drawing several cards before a play is
   visible rather than instant. Guarantees against a stuck game: the stock
-  recycles from the discard pile, and a player with no move and nothing to draw
+  recycles from the discard pile, and a seat with no move and nothing to draw
   passes.
 
 - **Reducers stay pure; the container owns the network.** Every game is a
@@ -311,7 +320,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **253 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **255 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
   profanity filter, auth input rules, leaderboard validation/formatting, and
@@ -386,12 +395,12 @@ and login still work, there's just no real email in the loop.
 
 Things worth adding if this grew past a portfolio piece:
 
-- War, Old Maid, Crazy Eights, Go Fish, and Trash are still fixed at 2
-  seats. Their rules are genuinely head-to-head as designed (War splits one
-  deck exactly in half; Old Maid's "draw from the dealer" and Go Fish's
-  "ask the opponent" have nobody else to name as the target), so going
-  past 2 players means redesigning each game's actual turn/target logic,
-  not just widening a seat count the way Slapjack's and Hold'em's rooms
-  do. Trash's row size (10 cards each) additionally caps it at 4 players
-  even if the seat-count plumbing were generalized — 6×10 doesn't fit in
-  one 52-card deck.
+- War, Old Maid, Go Fish, and Trash are still fixed at 2 seats. Their
+  rules are genuinely head-to-head as designed (War splits one deck
+  exactly in half; Old Maid's "draw from the dealer" and Go Fish's "ask
+  the opponent" have nobody else to name as the target), so going past 2
+  players means redesigning each game's actual turn/target logic, not
+  just widening a seat count the way Slapjack's, Crazy Eights', and
+  Hold'em's rooms do. Trash's row size (10 cards each) additionally caps
+  it at 4 players even if the seat-count plumbing were generalized —
+  6×10 doesn't fit in one 52-card deck.
