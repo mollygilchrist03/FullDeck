@@ -9,7 +9,7 @@
 import type { Card } from '../../types/card.js'
 import { rankValue } from '../../lib/rank.js'
 import { bestHand, type HandCategory } from './handRank.js'
-import { BIG_BLIND, revealedBoard, toCall, type HoldemState } from './holdemReducer.js'
+import { BIG_BLIND, potTotal, revealedBoard, toCall, type HoldemState } from './holdemReducer.js'
 
 export type AiDecision = { type: 'FOLD' } | { type: 'CHECK' } | { type: 'CALL' } | { type: 'BET'; to: number }
 
@@ -52,30 +52,35 @@ export function handStrength(hole: [Card, Card], board: Card[]): number {
   return Math.min(1, POSTFLOP_BASE[rank.category] + ((rank.tiebreak[0] ?? 0) / 14) * 0.14)
 }
 
-/** The AI's move for the current state. Only ever called when it's the AI's turn. */
-export function chooseAiAction(state: HoldemState): AiDecision {
-  const strength = handStrength(state.aiHole as [Card, Card], revealedBoard(state))
-  const call = toCall(state, 'ai')
-  const pot = state.pot + state.playerBet + state.aiBet
-  const stack = state.aiStack
+/** The AI's move for the given seat. Only ever called when it's that seat's turn. */
+export function chooseAiAction(state: HoldemState, seat: number): AiDecision {
+  const st = state.seats[seat]
+  const strength = handStrength(st.hole as [Card, Card], revealedBoard(state))
+  const call = toCall(state, seat)
+  const pot = potTotal(state)
+  const stack = st.stack
+  const liveOpponents = state.seats.filter((s, i) => i !== seat && !s.folded && !s.eliminated).length
 
   if (call === 0) {
     // Nothing to call — value-bet a real hand, check air and marginal spots.
     if (stack > 0 && strength >= 0.4) {
       const frac = strength >= 0.72 ? 0.75 : strength >= 0.55 ? 0.6 : 0.45
       const size = Math.max(BIG_BLIND, Math.round(Math.max(pot, BIG_BLIND) * frac))
-      return { type: 'BET', to: state.aiBet + Math.min(stack, size) }
+      return { type: 'BET', to: st.bet + Math.min(stack, size) }
     }
     return { type: 'CHECK' }
   }
 
   // Facing a bet. Fold only when the price is clearly worse than the hand —
   // a little slack so it doesn't fold every thin spot and become exploitable.
+  // More live opponents means less equity for the same hand, so tighten the
+  // continue threshold a bit per extra opponent.
   const potOdds = call / (pot + call)
-  if (strength + 0.05 < potOdds) return { type: 'FOLD' }
+  const slack = 0.05 - 0.02 * Math.max(0, liveOpponents - 1)
+  if (strength + slack < potOdds) return { type: 'FOLD' }
   if (strength >= 0.66 && stack > call) {
     const raiseBy = Math.max(BIG_BLIND, Math.round(pot * 0.7))
-    return { type: 'BET', to: state.aiBet + call + Math.min(stack - call, raiseBy) }
+    return { type: 'BET', to: st.bet + call + Math.min(stack - call, raiseBy) }
   }
   return { type: 'CALL' }
 }

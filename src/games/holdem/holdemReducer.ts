@@ -1,20 +1,27 @@
 /**
- * Heads-up No-Limit Texas Hold'em — a real betting engine, not a simplified
- * "bet the same amount every time" toy. Runs on bet-TO semantics (an action
- * names the total you'll have put in this street, not an increment), which
- * is what makes multi-raise streets and all-in-for-less trivial to express.
+ * No-Limit Texas Hold'em for 2-6 seats — a real betting engine with side
+ * pots, not a simplified "everyone bets the same" toy. Runs on bet-TO
+ * semantics (an action names the total you'll have put in this street, not
+ * an increment), which is what makes multi-raise streets and all-in-for-less
+ * trivial to express.
  *
- * Big simplifying trick: all 5 board cards are dealt into state up front
- * (same call as Go Fish/Trash keeping the whole stock in state) and only
- * *revealed* a few at a time by phase — so running out an all-in to
- * showdown is just advancing phase with no further card draws needed, and
- * the reducer never has to ask the container for cards mid-hand.
+ * Seats are addressed by index (0..seats.length-1), not named roles — the
+ * same reducer runs a 2-seat solo-vs-AI match and a 6-seat online table.
+ * `contributed` (each seat's running total for the whole hand, never reset
+ * between streets) is the only bookkeeping side pots need: nothing is
+ * "refunded" mid-street when a short all-in can't be fully called — an
+ * uncalled excess just becomes a pot layer only its contributor reaches,
+ * which resolves to a plain refund at showdown. See `computeSidePots`.
+ *
+ * Big simplifying trick, same as the old heads-up version: all of a hand's
+ * hole cards + the 5 board cards are dealt into state up front and only
+ * *revealed* a few at a time by phase — so running an all-in out to
+ * showdown is just advancing phase, no further card draws needed.
  */
 import type { Card } from '../../types/card.js'
-import { bestHand, compareHandRank, type HandRank } from './handRank.js'
+import { bestHand, compareHandRank, CATEGORY_LABEL, type HandCategory } from './handRank.js'
 
 export type HoldemPhase = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown' | 'handover'
-export type Side = 'player' | 'ai'
 
 export const SMALL_BLIND = 5
 export const BIG_BLIND = 10
@@ -28,335 +35,400 @@ const BOARD_SHOWN: Record<HoldemPhase, number> = {
   handover: 5,
 }
 
+export interface SeatState {
+  stack: number
+  hole: Card[]
+  /** Chips in this street. */
+  bet: number
+  /** Chips in this *hand*, across every street — the only number side pots need. */
+  contributed: number
+  folded: boolean
+  acted: boolean
+  /** Stack hit 0 after a hand settled — sits out every hand for the rest of the match. */
+  eliminated: boolean
+}
+
+export interface PotResult {
+  amount: number
+  winners: number[]
+  category?: HandCategory
+}
+
 export interface HoldemState {
   phase: HoldemPhase
-  button: Side
-  /** Whose action it is; null once nobody needs to act (showdown/handover). */
-  toAct: Side | null
-  playerStack: number
-  aiStack: number
-  playerHole: Card[]
-  aiHole: Card[]
+  seats: SeatState[]
+  /** Seat index holding the button. */
+  button: number
+  /** Whose action it is; null once nobody needs to act. */
+  toAct: number | null
   /** All 5, always — see BOARD_SHOWN for how many `revealedBoard` shows. */
   board: Card[]
-  /** Chips already folded in from completed streets. */
-  pot: number
-  playerBet: number
-  aiBet: number
   /** Size of the last full bet/raise this street — the minimum a re-raise must
    * add on top of the current bet (a short all-in is the only exception). */
   lastRaise: number
-  actedPlayer: boolean
-  actedAi: boolean
-  playerFolded: boolean
-  aiFolded: boolean
-  winner: Side | 'split' | null
-  winAmount: number
-  playerRank: HandRank | null
-  aiRank: HandRank | null
+  /** How the last hand's pot(s) were split — empty until a hand ends. */
+  potResults: PotResult[]
   log: string[]
   handsPlayed: number
-  /** Set once a stack hits 0 after a hand settles — the match is over. */
-  matchWinner: Side | null
+  /** Seat index once only one seat still has chips — the match is over. */
+  matchWinner: number | null
 }
 
 export type HoldemAction =
-  | { type: 'START'; playerHole: [Card, Card]; aiHole: [Card, Card]; board: Card[] }
-  | { type: 'NEW_HAND'; playerHole: [Card, Card]; aiHole: [Card, Card]; board: Card[] }
-  | { type: 'CHECK'; side: Side }
-  | { type: 'CALL'; side: Side }
-  | { type: 'BET'; side: Side; to: number }
-  | { type: 'FOLD'; side: Side }
+  | { type: 'START'; seatCount: number; holes: Card[][]; board: Card[] }
+  | { type: 'NEW_HAND'; holes: Card[][]; board: Card[] }
+  | { type: 'CHECK'; seat: number }
+  | { type: 'CALL'; seat: number }
+  | { type: 'BET'; seat: number; to: number }
+  | { type: 'FOLD'; seat: number }
 
-const other = (side: Side): Side => (side === 'player' ? 'ai' : 'player')
 const push = (log: string[], line: string): string[] => [...log, line].slice(-6)
 
-function stackOf(s: HoldemState, side: Side): number {
-  return side === 'player' ? s.playerStack : s.aiStack
-}
-function betOf(s: HoldemState, side: Side): number {
-  return side === 'player' ? s.playerBet : s.aiBet
-}
-function setStack(s: HoldemState, side: Side, value: number): HoldemState {
-  return side === 'player' ? { ...s, playerStack: value } : { ...s, aiStack: value }
-}
-function setBet(s: HoldemState, side: Side, value: number): HoldemState {
-  return side === 'player' ? { ...s, playerBet: value } : { ...s, aiBet: value }
-}
-function setActed(s: HoldemState, side: Side, value: boolean): HoldemState {
-  return side === 'player' ? { ...s, actedPlayer: value } : { ...s, actedAi: value }
+/** Highest bet still standing among seats that haven't folded. */
+function highBet(s: HoldemState): number {
+  return Math.max(0, ...s.seats.filter((st) => !st.folded).map((st) => st.bet))
 }
 
-export function toCall(s: HoldemState, side: Side): number {
-  return Math.max(0, betOf(s, other(side)) - betOf(s, side))
+export function toCall(s: HoldemState, seat: number): number {
+  return Math.max(0, highBet(s) - s.seats[seat].bet)
 }
 
-/** The most a side could bet/raise TO this street (an all-in). */
-export function maxBetTo(s: HoldemState, side: Side): number {
-  return betOf(s, side) + stackOf(s, side)
+/** The most a seat could bet/raise TO this street (an all-in). */
+export function maxBetTo(s: HoldemState, seat: number): number {
+  return s.seats[seat].bet + s.seats[seat].stack
+}
+
+/** Total chips in the pot right now, current street included. */
+export function potTotal(s: HoldemState): number {
+  return s.seats.reduce((sum, st) => sum + st.contributed, 0)
 }
 
 export function revealedBoard(s: HoldemState): Card[] {
   return s.board.slice(0, BOARD_SHOWN[s.phase])
 }
 
-export function initHoldem(): HoldemState {
+/** Idle table state before the first hand is dealt. */
+export function initHoldem(seatCount: number): HoldemState {
   return {
-    phase: 'preflop',
-    button: 'player',
+    phase: 'handover',
+    seats: Array.from({ length: seatCount }, () => ({
+      stack: STARTING_STACK,
+      hole: [],
+      bet: 0,
+      contributed: 0,
+      folded: false,
+      acted: false,
+      eliminated: false,
+    })),
+    button: 0,
     toAct: null,
-    playerStack: STARTING_STACK,
-    aiStack: STARTING_STACK,
-    playerHole: [],
-    aiHole: [],
     board: [],
-    pot: 0,
-    playerBet: 0,
-    aiBet: 0,
     lastRaise: BIG_BLIND,
-    actedPlayer: false,
-    actedAi: false,
-    playerFolded: false,
-    aiFolded: false,
-    winner: null,
-    winAmount: 0,
-    playerRank: null,
-    aiRank: null,
+    potResults: [],
     log: [],
     handsPlayed: 0,
     matchWinner: null,
   }
 }
 
-/** Posts blinds for a fresh hand, dealing hole/board cards and setting up
- * preflop action (button/small-blind acts first, heads-up). */
-function dealHand(
-  s: HoldemState,
-  button: Side,
-  playerHole: [Card, Card],
-  aiHole: [Card, Card],
-  board: Card[],
-): HoldemState {
-  const sbSide = button
-  const bbSide = other(button)
-  let next: HoldemState = {
-    ...s,
-    phase: 'preflop',
-    button,
-    playerHole,
-    aiHole,
-    board,
-    pot: 0,
-    playerBet: 0,
-    aiBet: 0,
-    lastRaise: BIG_BLIND, // preflop, the min raise is to 2x the big blind
-    actedPlayer: false,
-    actedAi: false,
-    playerFolded: false,
-    aiFolded: false,
-    winner: null,
-    winAmount: 0,
-    playerRank: null,
-    aiRank: null,
-    handsPlayed: s.handsPlayed + 1,
+/** Next seat (clockwise) that hasn't busted — used for the button and blinds,
+ * which land on a live seat even mid-hand-setup, before anyone's folded. */
+function nextLiveSeat(seats: SeatState[], from: number): number {
+  const n = seats.length
+  for (let step = 1; step <= n; step += 1) {
+    const i = (from + step) % n
+    if (!seats[i].eliminated) return i
   }
-  const sb = Math.min(SMALL_BLIND, stackOf(next, sbSide))
-  next = setBet(setStack(next, sbSide, stackOf(next, sbSide) - sb), sbSide, sb)
-  const bb = Math.min(BIG_BLIND, stackOf(next, bbSide))
-  next = setBet(setStack(next, bbSide, stackOf(next, bbSide) - bb), bbSide, bb)
-  next = {
-    ...next,
-    log: push(next.log, `New hand — ${sbSide === 'player' ? 'you have' : 'the house has'} the button.`),
-  }
-  return settleIfNeeded(next, sbSide)
+  return from
 }
 
-/** True once nobody can or needs to act further on the current street. */
-function bettingDone(s: HoldemState): boolean {
-  if (s.playerStack === 0 || s.aiStack === 0) return s.playerBet === s.aiBet
-  return s.actedPlayer && s.actedAi && s.playerBet === s.aiBet
+/** Next seat that still needs to act this street: not folded, not eliminated,
+ * not already all-in. Assumed to exist whenever this is called. */
+function nextToActFrom(s: HoldemState, fromSeat: number): number {
+  const n = s.seats.length
+  for (let step = 1; step <= n; step += 1) {
+    const i = (fromSeat + step) % n
+    const st = s.seats[i]
+    if (!st.folded && !st.eliminated && st.stack > 0) return i
+  }
+  return fromSeat
 }
 
-/** Folds this street's bets into the pot and either opens the next street's
- * action or (river done / all-in runout) proceeds to showdown. Recurses when
- * a stack is already at 0, so an all-in runs straight out to showdown with
- * no further betting. */
-function advanceStreet(s: HoldemState): HoldemState {
-  const potNow = s.pot + s.playerBet + s.aiBet
+function postBlind(seats: SeatState[], seat: number, amount: number): SeatState[] {
+  const paid = Math.min(amount, seats[seat].stack)
+  return seats.map((st, i) =>
+    i === seat ? { ...st, stack: st.stack - paid, bet: st.bet + paid, contributed: st.contributed + paid } : st,
+  )
+}
+
+/** Deals hole cards, posts blinds, and opens preflop action. `holes` has one
+ * entry per non-eliminated seat, in seat-index order. Heads-up, the button
+ * posts the small blind and acts first preflop (last on every street after);
+ * 3+, blinds are the two seats after the button and action opens under the gun —
+ * both fall out of always resuming action from the big blind's seat. */
+function beginHand(baseSeats: SeatState[], button: number, holes: Card[][], board: Card[], handsPlayed: number): HoldemState {
+  let holeIdx = 0
+  let seats = baseSeats.map((st) =>
+    st.eliminated
+      ? { ...st, hole: [], bet: 0, contributed: 0, folded: true, acted: true }
+      : { ...st, hole: holes[holeIdx++], bet: 0, contributed: 0, folded: false, acted: false },
+  )
+  const liveCount = seats.filter((st) => !st.eliminated).length
+  const sbSeat = liveCount === 2 ? button : nextLiveSeat(seats, button)
+  const bbSeat = nextLiveSeat(seats, sbSeat)
+  seats = postBlind(seats, sbSeat, SMALL_BLIND)
+  seats = postBlind(seats, bbSeat, BIG_BLIND)
+
   const base: HoldemState = {
-    ...s,
-    pot: potNow,
-    playerBet: 0,
-    aiBet: 0,
-    lastRaise: BIG_BLIND, // postflop the min *bet* is one big blind
-    actedPlayer: s.playerStack === 0,
-    actedAi: s.aiStack === 0,
+    phase: 'preflop',
+    seats,
+    button,
+    toAct: null,
+    board,
+    lastRaise: BIG_BLIND,
+    potResults: [],
+    log: push([], 'New hand.'),
+    handsPlayed: handsPlayed + 1,
+    matchWinner: null,
   }
-
-  if (s.phase === 'river') return showdown(base)
-
-  const nextPhase: HoldemPhase = s.phase === 'preflop' ? 'flop' : s.phase === 'flop' ? 'turn' : 'river'
-  const firstToAct = other(s.button)
-  const dealt: HoldemState = {
-    ...base,
-    phase: nextPhase,
-    toAct: firstToAct,
-    log: push(base.log, `${nextPhase[0].toUpperCase()}${nextPhase.slice(1)}.`),
-  }
-  return settleIfNeeded(dealt, firstToAct)
+  return settleIfNeeded(base, bbSeat)
 }
 
-/** Call after any action that might have finished the street. `nextToAct` is
- * who should act if betting *isn't* resolved yet — the caller knows this
- * (the other side of whoever just acted, or the street's first-to-act). */
-function settleIfNeeded(s: HoldemState, nextToAct: Side): HoldemState {
-  if (s.playerFolded || s.aiFolded) return s
+function startHand(seatCount: number, holes: Card[][], board: Card[]): HoldemState {
+  const seats: SeatState[] = Array.from({ length: seatCount }, () => ({
+    stack: STARTING_STACK,
+    hole: [],
+    bet: 0,
+    contributed: 0,
+    folded: false,
+    acted: false,
+    eliminated: false,
+  }))
+  return beginHand(seats, 0, holes, board, 0)
+}
+
+function nextHand(state: HoldemState, holes: Card[][], board: Card[]): HoldemState {
+  const button = nextLiveSeat(state.seats, state.button)
+  return beginHand(state.seats, button, holes, board, state.handsPlayed)
+}
+
+/** True once every seat still in the hand has matched the high bet or is all-in. */
+function bettingDone(s: HoldemState): boolean {
+  const actors = s.seats.filter((st) => !st.folded && !st.eliminated && st.stack > 0)
+  const hb = highBet(s)
+  // Fewer than 2 seats that could still act means there's nobody left who
+  // could raise further — so a lone actor only needs to have *matched* the
+  // high bet (e.g. called a short all-in), not necessarily to have "acted"
+  // on a fresh street with nothing yet to call. With 2+ still-live actors,
+  // every one of them has to have both acted and matched.
+  if (actors.length <= 1) return actors.every((st) => st.bet === hb)
+  return actors.every((st) => st.acted && st.bet === hb)
+}
+
+/** Call after any action that might have finished the street. `fromSeat` is
+ * who just acted (or the street's dealer-adjacent seat, at street start) —
+ * either way the next actor is simply the next live seat after them. */
+function settleIfNeeded(s: HoldemState, fromSeat: number): HoldemState {
   if (bettingDone(s)) return advanceStreet(s)
-  return { ...s, toAct: nextToAct }
+  return { ...s, toAct: nextToActFrom(s, fromSeat) }
 }
 
-function withMatchCheck(s: HoldemState): HoldemState {
-  if (s.playerStack === 0) return { ...s, matchWinner: 'ai' }
-  if (s.aiStack === 0) return { ...s, matchWinner: 'player' }
-  return s
-}
+const STREET_LABEL: Record<string, string> = { flop: 'Flop', turn: 'Turn', river: 'River' }
 
-function awardPot(s: HoldemState, winner: Side | 'split'): HoldemState {
-  const total = s.pot + s.playerBet + s.aiBet
-  let next: HoldemState = { ...s, pot: 0, playerBet: 0, aiBet: 0, phase: 'handover', toAct: null, winner }
-  if (winner === 'split') {
-    const half = Math.floor(total / 2)
-    next = setStack(next, 'player', next.playerStack + half)
-    // Odd chip (only possible with an odd total) goes to the big blind.
-    next = setStack(next, 'ai', next.aiStack + (total - half))
-    next = { ...next, winAmount: half }
-  } else {
-    next = setStack(next, winner, stackOf(next, winner) + total)
-    next = { ...next, winAmount: total }
+/** Folds this street's bets in (bets already live in `contributed`, so this
+ * is just clearing `bet` for the next street) and opens the next street's
+ * action, or — river done, or every remaining seat is all-in — goes to
+ * showdown. Recurses when nobody's left who can act, so an all-in runs
+ * straight out to showdown with no further betting. */
+function advanceStreet(s: HoldemState): HoldemState {
+  if (s.phase === 'river') return showdownAward(s)
+  const nextPhase: HoldemPhase = s.phase === 'preflop' ? 'flop' : s.phase === 'flop' ? 'turn' : 'river'
+  const seats = s.seats.map((st) => ({ ...st, bet: 0, acted: st.stack === 0 }))
+  const dealt: HoldemState = {
+    ...s,
+    phase: nextPhase,
+    seats,
+    lastRaise: BIG_BLIND,
+    toAct: null,
+    log: push(s.log, `${STREET_LABEL[nextPhase]}.`),
   }
-  return withMatchCheck(next)
+  return settleIfNeeded(dealt, s.button)
 }
 
-function showdown(s: HoldemState): HoldemState {
-  const playerRank = bestHand([...s.playerHole, ...s.board])
-  const aiRank = bestHand([...s.aiHole, ...s.board])
-  const cmp = compareHandRank(playerRank, aiRank)
-  const winner: Side | 'split' = cmp > 0 ? 'player' : cmp < 0 ? 'ai' : 'split'
-  const awarded = awardPot({ ...s, phase: 'showdown', playerRank, aiRank }, winner)
-  const msg =
-    winner === 'split'
-      ? `Split pot — both had ${playerRank.category}.`
-      : winner === 'player'
-        ? `You win ${awarded.winAmount} with ${playerRank.category}.`
-        : `The house wins ${awarded.winAmount} with ${aiRank.category}.`
-  return { ...awarded, log: push(s.log, msg) }
+/** Layer the pot by each seat's total contribution this hand — the classic
+ * side-pot algorithm. A seat whose all-in fell short of the table only
+ * contests pot layers up to its own contribution; a fold contributes chips
+ * to every layer it reached but is never eligible to win one. Adjacent
+ * layers with the same eligible set are merged, purely so the "N pots"
+ * shown to a player matches how a table would actually describe them. */
+function computeSidePots(seats: SeatState[]): { amount: number; eligible: number[] }[] {
+  const levels = [...new Set(seats.map((st) => st.contributed).filter((c) => c > 0))].sort((a, b) => a - b)
+  const pots: { amount: number; eligible: number[] }[] = []
+  let prev = 0
+  for (const level of levels) {
+    const contributors = seats.map((st, i) => (st.contributed >= level ? i : -1)).filter((i) => i >= 0)
+    const amount = (level - prev) * contributors.length
+    if (amount > 0) {
+      const eligible = contributors.filter((i) => !seats[i].folded)
+      const last = pots[pots.length - 1]
+      if (last && last.eligible.length === eligible.length && last.eligible.every((x) => eligible.includes(x))) {
+        last.amount += amount
+      } else {
+        pots.push({ amount, eligible })
+      }
+    }
+    prev = level
+  }
+  return pots
 }
 
-function fold(s: HoldemState, side: Side): HoldemState {
-  const winner = other(side)
-  const marked = side === 'player' ? { ...s, playerFolded: true } : { ...s, aiFolded: true }
-  const awarded = awardPot(marked, winner)
+/** Split order for an odd chip in a tied pot: the eligible winner closest to
+ * the button, going clockwise (the same seat that would act first postflop). */
+function orderByButton(winners: number[], button: number, seatCount: number): number[] {
+  return [...winners].sort((a, b) => ((a - button + seatCount) % seatCount) - ((b - button + seatCount) % seatCount))
+}
+
+function describeResults(results: PotResult[]): string {
+  return results
+    .map((r, i) => {
+      const prefix = results.length > 1 ? `Pot ${i + 1}: ` : ''
+      const who = r.winners.length > 1 ? `Seats ${r.winners.map((w) => w + 1).join('/')} split` : `Seat ${r.winners[0] + 1} wins`
+      const hand = r.category ? ` with ${CATEGORY_LABEL[r.category]}` : ''
+      return `${prefix}${who} $${r.amount}${hand}.`
+    })
+    .join(' ')
+}
+
+/** Award each pot layer's chips, mark any seat that hit 0 as eliminated, and
+ * check whether only one seat is left standing (match over). */
+function finishHand(s: HoldemState, results: PotResult[]): HoldemState {
+  let seats = s.seats.map((st) => ({ ...st }))
+  for (const pr of results) {
+    const share = Math.floor(pr.amount / pr.winners.length)
+    let remainder = pr.amount - share * pr.winners.length
+    for (const w of orderByButton(pr.winners, s.button, s.seats.length)) {
+      const extra = remainder > 0 ? 1 : 0
+      remainder = Math.max(0, remainder - 1)
+      seats[w] = { ...seats[w], stack: seats[w].stack + share + extra }
+    }
+  }
+  seats = seats.map((st) => (st.stack === 0 && !st.eliminated ? { ...st, eliminated: true } : st))
+  const stillIn = seats.reduce<number[]>((acc, st, i) => (st.eliminated ? acc : [...acc, i]), [])
   return {
-    ...awarded,
-    log: push(s.log, `${side === 'player' ? 'You' : 'The house'} fold${side === 'player' ? '' : 's'}.`),
+    ...s,
+    seats,
+    phase: 'handover',
+    toAct: null,
+    potResults: results,
+    matchWinner: stillIn.length === 1 ? stillIn[0] : null,
+    log: push(s.log, describeResults(results)),
   }
 }
 
-function check(s: HoldemState, side: Side): HoldemState {
-  if (toCall(s, side) !== 0) return s
-  const acted = setActed(s, side, true)
-  return settleIfNeeded(
-    {
-      ...acted,
-      log: push(acted.log, `${side === 'player' ? 'You' : 'The house'} check${side === 'player' ? '' : 's'}.`),
-    },
-    other(side),
-  )
+/** Every seat but one folded — that seat scoops the whole pot, no showdown. */
+function foldWin(s: HoldemState, winnerSeat: number): HoldemState {
+  return finishHand(s, [{ amount: potTotal(s), winners: [winnerSeat] }])
 }
 
-function call(s: HoldemState, side: Side): HoldemState {
-  const need = toCall(s, side)
-  if (need === 0) return check(s, side)
-  const opp = other(side)
-  const paid = Math.min(need, stackOf(s, side))
-  let next = setStack(s, side, stackOf(s, side) - paid)
-  next = setBet(next, side, betOf(next, side) + paid)
-  next = setActed(next, side, true)
-  // All-in for less: refund the shover's uncalled excess.
-  const shortfall = need - paid
-  if (shortfall > 0) {
-    next = setBet(next, opp, betOf(next, opp) - shortfall)
-    next = setStack(next, opp, stackOf(next, opp) + shortfall)
-  }
-  return settleIfNeeded(
-    {
-      ...next,
-      log: push(next.log, `${side === 'player' ? 'You' : 'The house'} call${side === 'player' ? '' : 's'}.`),
-    },
-    other(side),
-  )
+function showdownAward(s: HoldemState): HoldemState {
+  const pots = computeSidePots(s.seats)
+  const results: PotResult[] = pots.map((pot) => {
+    if (pot.eligible.length === 1) return { amount: pot.amount, winners: pot.eligible }
+    const ranked = pot.eligible.map((i) => ({ i, rank: bestHand([...s.seats[i].hole, ...s.board]) }))
+    const best = ranked.reduce((b, r) => (compareHandRank(r.rank, b.rank) > 0 ? r : b))
+    const winners = ranked.filter((r) => compareHandRank(r.rank, best.rank) === 0).map((r) => r.i)
+    return { amount: pot.amount, winners, category: best.rank.category }
+  })
+  return finishHand({ ...s, phase: 'showdown' }, results)
 }
 
-function bet(s: HoldemState, side: Side, to: number): HoldemState {
-  const cap = maxBetTo(s, side) // this side's all-in total
-  const opp = other(side)
-  const highBet = betOf(s, opp)
+function fold(s: HoldemState, seat: number): HoldemState {
+  const seats = s.seats.map((st, i) => (i === seat ? { ...st, folded: true, acted: true } : st))
+  const withLog = { ...s, seats, log: push(s.log, `Seat ${seat + 1} folds.`) }
+  const remaining = seats.reduce<number[]>((acc, st, i) => (st.folded ? acc : [...acc, i]), [])
+  if (remaining.length === 1) return foldWin(withLog, remaining[0])
+  return settleIfNeeded(withLog, seat)
+}
+
+function check(s: HoldemState, seat: number): HoldemState {
+  if (toCall(s, seat) !== 0) return s
+  const seats = s.seats.map((st, i) => (i === seat ? { ...st, acted: true } : st))
+  const next = { ...s, seats, log: push(s.log, `Seat ${seat + 1} checks.`) }
+  return settleIfNeeded(next, seat)
+}
+
+function call(s: HoldemState, seat: number): HoldemState {
+  const need = toCall(s, seat)
+  if (need === 0) return check(s, seat)
+  const st0 = s.seats[seat]
+  const paid = Math.min(need, st0.stack)
+  const seats = s.seats.map((st, i) =>
+    i === seat ? { ...st, stack: st.stack - paid, bet: st.bet + paid, contributed: st.contributed + paid, acted: true } : st,
+  )
+  const next = { ...s, seats, log: push(s.log, `Seat ${seat + 1} calls.`) }
+  return settleIfNeeded(next, seat)
+}
+
+function bet(s: HoldemState, seat: number, to: number): HoldemState {
+  const cap = maxBetTo(s, seat) // this seat's all-in total
+  const hb = highBet(s)
   // Can't even call, let alone raise — that's an all-in-for-less CALL, not a BET.
-  if (cap <= highBet) return s
-  if (to <= highBet) return s // not attempting to raise at all — use CALL
+  if (cap <= hb) return s
+  if (to <= hb) return s // not attempting to raise at all — use CALL
 
   // No-limit min-raise: a raise must add at least the size of the previous
   // bet/raise on top of the current bet (`lastRaise`); the min *bet* on an
   // unbet street is one big blind. A requested amount below that is bumped up
-  // — except a shove that is itself short, which is allowed all-in.
-  const minRaiseTo = highBet + s.lastRaise
+  // — except a shove that is itself short, which is allowed all-in. (A short
+  // all-in *should* deny players who already called a full bet the right to
+  // re-raise it — this project keeps that edge case simple, like the min-raise
+  // rule before it: any raise, short or full, reopens the action for everyone.)
+  const minRaiseTo = hb + s.lastRaise
   const target = Math.min(cap, Math.max(to, minRaiseTo))
 
-  if (target <= betOf(s, side)) return s
-  const delta = target - betOf(s, side)
-  let next = setStack(s, side, stackOf(s, side) - delta)
-  next = setBet(next, side, target)
-  next = setActed(next, side, true)
-  next = setActed(next, opp, false) // a raise reopens the action
-  const increment = target - highBet
-  // A full raise raises the bar for the next re-raise; a short all-in doesn't.
+  const st0 = s.seats[seat]
+  if (target <= st0.bet) return s
+  const delta = target - st0.bet
+  let seats = s.seats.map((st, i) =>
+    i === seat ? { ...st, stack: st.stack - delta, bet: target, contributed: st.contributed + delta, acted: true } : st,
+  )
+  seats = seats.map((st, i) => (i !== seat && !st.folded && !st.eliminated && st.stack > 0 ? { ...st, acted: false } : st))
+  const increment = target - hb
   const lastRaise = increment >= s.lastRaise ? increment : s.lastRaise
-  const isRaise = highBet > 0
-  const word = side === 'player' ? (isRaise ? 'raise to' : 'bet') : isRaise ? 'raises to' : 'bets'
-  return {
-    ...next,
-    lastRaise,
-    toAct: opp,
-    log: push(next.log, `${side === 'player' ? 'You' : 'The house'} ${word} ${target}.`),
-  }
+  const word = hb > 0 ? 'raises to' : 'bets'
+  const next = { ...s, seats, lastRaise, log: push(s.log, `Seat ${seat + 1} ${word} ${target}.`) }
+  return settleIfNeeded(next, seat)
+}
+
+function canAct(s: HoldemState, seat: number): boolean {
+  return s.phase !== 'handover' && s.phase !== 'showdown' && s.toAct === seat
 }
 
 export function holdemReducer(state: HoldemState, action: HoldemAction): HoldemState {
   switch (action.type) {
     case 'START':
-      return dealHand(initHoldem(), 'player', action.playerHole, action.aiHole, action.board)
+      return startHand(action.seatCount, action.holes, action.board)
 
-    case 'NEW_HAND': {
-      if (state.phase !== 'handover' || state.matchWinner) return state
-      return dealHand(state, other(state.button), action.playerHole, action.aiHole, action.board)
-    }
+    case 'NEW_HAND':
+      if (state.phase !== 'handover' || state.matchWinner != null) return state
+      return nextHand(state, action.holes, action.board)
 
     case 'CHECK':
-      if (state.phase === 'handover' || state.phase === 'showdown' || state.toAct !== action.side) return state
-      return check(state, action.side)
+      if (!canAct(state, action.seat)) return state
+      return check(state, action.seat)
 
     case 'CALL':
-      if (state.phase === 'handover' || state.phase === 'showdown' || state.toAct !== action.side) return state
-      return call(state, action.side)
+      if (!canAct(state, action.seat)) return state
+      return call(state, action.seat)
 
     case 'BET':
-      if (state.phase === 'handover' || state.phase === 'showdown' || state.toAct !== action.side) return state
-      if (stackOf(state, action.side) === 0) return state
-      return bet(state, action.side, action.to)
+      if (!canAct(state, action.seat)) return state
+      if (state.seats[action.seat].stack === 0) return state
+      return bet(state, action.seat, action.to)
 
     case 'FOLD':
-      if (state.phase === 'handover' || state.phase === 'showdown' || state.toAct !== action.side) return state
-      return fold(state, action.side)
+      if (!canAct(state, action.seat)) return state
+      return fold(state, action.seat)
 
     default:
       return state
