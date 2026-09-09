@@ -24,7 +24,7 @@ export const SEAT_RANGE: Record<MpGameKey, { min: number; max: number }> = {
   war: { min: 2, max: 2 },
   'crazy-eights': { min: 2, max: 6 },
   slapjack: { min: 2, max: 6 },
-  'go-fish': { min: 2, max: 2 },
+  'go-fish': { min: 2, max: 6 },
   trash: { min: 2, max: 2 },
   'old-maid': { min: 2, max: 6 },
   holdem: { min: 2, max: 6 },

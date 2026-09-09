@@ -1,36 +1,39 @@
 import type { Card, Rank } from '../../types/card.js'
 import { chooseAiAsk, countRank, takeBooks } from './goFishLogic.js'
 
-export type Side = 'player' | 'ai'
-export type GoFishPhase = 'playerAsk' | 'playerDraw' | 'aiAsk' | 'aiDraw' | 'gameover'
+export type GoFishPhase = 'ask' | 'draw' | 'gameover'
 
 export interface GoFishState {
-  playerHand: Card[]
-  aiHand: Card[]
+  /** One hand per seat. */
+  hands: Card[][]
   stock: Card[]
-  playerBooks: Rank[]
-  aiBooks: Rank[]
+  /** One array of completed-book ranks per seat. */
+  books: Rank[][]
   phase: GoFishPhase
-  /** During a *Draw phase: the rank that side asked for (null for a draw-up). */
+  /** Seat index whose turn it is. */
+  turn: number
+  /** During phase 'draw': the rank the asker just went fishing for (null for
+   * an empty-hand draw-up, which isn't chasing any particular rank). */
   pendingRank: Rank | null
   /**
-   * The AI's memory: ranks the player has *asked* for (public information —
-   * you can only ask for a rank you hold). Never anything the player drew from
-   * the stock; that stays secret. Capped to the last couple of asks in
-   * `doAsk`, and an entry is dropped once the AI has asked for it.
+   * The solo AI's memory (seat 1 only): ranks seat 0 has *asked* for (public
+   * information — you can only ask for a rank you hold). Capped to the last
+   * couple of asks, and an entry is dropped once the AI has asked for it.
+   * Multiplayer has no AI seat, so this is simply unused there.
    */
   knownPlayerRanks: Rank[]
   /** Increments each AI_STEP so the container can keep stepping. */
   aiSteps: number
+  /** Asks seat 0 has made — the score for a solo win. */
   turnsTaken: number
   log: string[]
-  winner: Side | null
+  winner: number | null
 }
 
 export type GoFishAction =
-  | { type: 'START'; playerHand: Card[]; aiHand: Card[]; stock: Card[] }
-  | { type: 'ASK'; rank: Rank; side?: Side }
-  | { type: 'DRAW'; side?: Side }
+  | { type: 'START'; hands: Card[][]; stock: Card[] }
+  | { type: 'ASK'; rank: Rank; target: number; seat?: number }
+  | { type: 'DRAW'; seat?: number }
   | { type: 'AI_STEP' }
   | { type: 'RESET' }
 
@@ -51,22 +54,14 @@ const RANK_LABEL: Record<Rank, string> = {
 }
 
 const push = (log: string[], line: string): string[] => [...log, line].slice(-6)
-const other = (s: Side): Side => (s === 'player' ? 'ai' : 'player')
-const handOf = (st: GoFishState, s: Side) => (s === 'player' ? st.playerHand : st.aiHand)
-const withHand = (st: GoFishState, s: Side, h: Card[]): GoFishState =>
-  s === 'player' ? { ...st, playerHand: h } : { ...st, aiHand: h }
-const name = (s: Side) => (s === 'player' ? 'You' : 'The dealer')
-const askPhase = (s: Side): GoFishPhase => (s === 'player' ? 'playerAsk' : 'aiAsk')
-const drawPhase = (s: Side): GoFishPhase => (s === 'player' ? 'playerDraw' : 'aiDraw')
 
-export function initGoFish(): GoFishState {
+export function initGoFish(seatCount: number): GoFishState {
   return {
-    playerHand: [],
-    aiHand: [],
+    hands: Array.from({ length: seatCount }, () => []),
     stock: [],
-    playerBooks: [],
-    aiBooks: [],
-    phase: 'playerAsk',
+    books: Array.from({ length: seatCount }, () => []),
+    phase: 'ask',
+    turn: 0,
     pendingRank: null,
     knownPlayerRanks: [],
     aiSteps: 0,
@@ -77,80 +72,91 @@ export function initGoFish(): GoFishState {
 }
 
 function bookAndCheck(state: GoFishState): GoFishState {
-  const p = takeBooks(state.playerHand)
-  const a = takeBooks(state.aiHand)
-  const playerBooks = [...state.playerBooks, ...p.books]
-  const aiBooks = [...state.aiBooks, ...a.books]
+  const results = state.hands.map((h) => takeBooks(h))
+  const hands = results.map((r) => r.hand)
+  const books = state.books.map((b, i) => [...b, ...results[i].books])
   let log = state.log
-  for (const b of p.books) log = push(log, `You completed a book of ${RANK_LABEL[b]}.`)
-  for (const b of a.books) log = push(log, `Dealer completed a book of ${RANK_LABEL[b]}.`)
+  for (let i = 0; i < results.length; i += 1) {
+    for (const b of results[i].books) log = push(log, `Seat ${i + 1} completed a book of ${RANK_LABEL[b]}.`)
+  }
 
   const next: GoFishState = {
     ...state,
-    playerHand: p.hand,
-    aiHand: a.hand,
-    playerBooks,
-    aiBooks,
-    knownPlayerRanks: state.knownPlayerRanks.filter((r) => !p.books.includes(r)),
+    hands,
+    books,
+    knownPlayerRanks: state.knownPlayerRanks.filter((r) => !results[0].books.includes(r)),
     log,
   }
 
-  const allGone =
-    next.playerHand.length === 0 && next.aiHand.length === 0 && next.stock.length === 0
-  if (playerBooks.length + aiBooks.length === 13 || allGone) {
-    const winner: Side = playerBooks.length >= aiBooks.length ? 'player' : 'ai'
+  const totalBooks = books.reduce((sum, b) => sum + b.length, 0)
+  const allGone = next.hands.every((h) => h.length === 0) && next.stock.length === 0
+  if (totalBooks === 13 || allGone) {
+    const counts = books.map((b) => b.length)
+    const most = Math.max(...counts)
+    const winner = counts.findIndex((c) => c === most)
     return {
       ...next,
       phase: 'gameover',
       winner,
-      log: push(log, winner === 'player' ? 'All books made — you win!' : 'All books made — the dealer wins.'),
+      log: push(log, `All books made — Seat ${winner + 1} wins.`),
     }
   }
   return next
 }
 
-/** Hand the turn to `side`; draw up first if their hand is empty. */
-function toTurn(state: GoFishState, side: Side): GoFishState {
+/** Hand the turn to `seat`; draw up first if their hand is empty, or find
+ * the next seat (in rotation) that can actually act if `seat` has neither
+ * cards nor stock to draw from. */
+function toTurn(state: GoFishState, seat: number): GoFishState {
   if (state.phase === 'gameover') return state
   const s = { ...state, pendingRank: null }
-  if (handOf(s, side).length > 0) return { ...s, phase: askPhase(side) }
-  if (s.stock.length > 0) return { ...s, phase: drawPhase(side) }
-  // Empty hand, empty stock. Pass to the other side if they can still play.
-  if (handOf(s, other(side)).length > 0) return { ...s, phase: askPhase(other(side)) }
-  return s // bookAndCheck's all-gone guard will have ended it
+  if (s.hands[seat].length > 0) return { ...s, phase: 'ask', turn: seat }
+  if (s.stock.length > 0) return { ...s, phase: 'draw', turn: seat }
+  const n = s.hands.length
+  for (let step = 1; step <= n; step += 1) {
+    const i = (seat + step) % n
+    if (s.hands[i].length > 0) return { ...s, phase: 'ask', turn: i }
+  }
+  return s // nobody has anything left — bookAndCheck's all-gone guard already ended it
 }
 
-function drawFor(state: GoFishState, side: Side): { state: GoFishState; drawn: Card | null } {
+function drawFor(state: GoFishState, seat: number): { state: GoFishState; drawn: Card | null } {
   if (state.stock.length === 0) return { state, drawn: null }
   const [drawn, ...stock] = state.stock
-  return { state: withHand({ ...state, stock }, side, [...handOf(state, side), drawn]), drawn }
+  const hands = state.hands.map((h, i) => (i === seat ? [...h, drawn] : h))
+  return { state: { ...state, stock, hands }, drawn }
 }
 
-/** How many recent player asks the AI keeps in mind. A real opponent
+/** How many recent asks the solo AI keeps in mind. A real opponent
  * remembers the last thing or two you asked for, not every rank forever. */
 const AI_MEMORY = 2
 
-function doAsk(state: GoFishState, asker: Side, rank: Rank): GoFishState {
-  if (state.phase !== askPhase(asker)) return state
-  if (countRank(handOf(state, asker), rank) === 0) return state
-  const opp = other(asker)
-  // The player asking reveals they hold `rank` — remember it, but only the
-  // last couple of asks. The AI asking *for* a remembered rank spends that
-  // read (it either cleaned you out or the info is now stale), so drop it.
+function doAsk(state: GoFishState, asker: number, rank: Rank, target: number): GoFishState {
+  if (state.phase !== 'ask' || state.turn !== asker) return state
+  if (target === asker || target < 0 || target >= state.hands.length) return state
+  if (countRank(state.hands[asker], rank) === 0) return state
+
+  // Seat 0's asks are public info the solo AI (seat 1) remembers; the AI
+  // asking *for* a remembered rank spends that read either way.
   const known =
-    asker === 'player'
+    asker === 0
       ? [...state.knownPlayerRanks.filter((r) => r !== rank), rank].slice(-AI_MEMORY)
       : state.knownPlayerRanks.filter((r) => r !== rank)
-  const turnsTaken = asker === 'player' ? state.turnsTaken + 1 : state.turnsTaken
-  const taken = handOf(state, opp).filter((c) => c.rank === rank)
+  const turnsTaken = asker === 0 ? state.turnsTaken + 1 : state.turnsTaken
+  const taken = state.hands[target].filter((c) => c.rank === rank)
 
   if (taken.length > 0) {
-    let s: GoFishState = { ...state, knownPlayerRanks: known, turnsTaken }
-    s = withHand(s, asker, [...handOf(s, asker), ...taken])
-    s = withHand(s, opp, handOf(s, opp).filter((c) => c.rank !== rank))
+    const hands = state.hands.map((h, i) => {
+      if (i === asker) return [...h, ...taken]
+      if (i === target) return h.filter((c) => c.rank !== rank)
+      return h
+    })
     const booked = bookAndCheck({
-      ...s,
-      log: push(state.log, `${name(opp)} hands over ${taken.length} × ${RANK_LABEL[rank]}. Go again.`),
+      ...state,
+      hands,
+      knownPlayerRanks: known,
+      turnsTaken,
+      log: push(state.log, `Seat ${target + 1} hands over ${taken.length} × ${RANK_LABEL[rank]} to Seat ${asker + 1}. Go again.`),
     })
     // "Go again" — but if that hit emptied the asker's hand (booked their
     // last rank), route through toTurn so they draw up or pass instead of
@@ -162,75 +168,66 @@ function doAsk(state: GoFishState, asker: Side, rank: Rank): GoFishState {
     ...state,
     knownPlayerRanks: known,
     turnsTaken,
-    phase: drawPhase(asker),
+    phase: 'draw',
     pendingRank: rank,
-    log: push(state.log, `No ${RANK_LABEL[rank]} — ${asker === 'player' ? 'go fish. Draw a card.' : 'the dealer fishes.'}`),
+    log: push(state.log, `Seat ${target + 1} has no ${RANK_LABEL[rank]} — Seat ${asker + 1} goes fish.`),
   }
 }
 
-function doDraw(state: GoFishState, drawer: Side): GoFishState {
-  if (state.phase !== drawPhase(drawer)) return state
-  if (state.stock.length === 0) return toTurn(state, other(drawer))
+function doDraw(state: GoFishState, drawer: number): GoFishState {
+  if (state.phase !== 'draw' || state.turn !== drawer) return state
+  const n = state.hands.length
+  if (state.stock.length === 0) return toTurn(state, (drawer + 1) % n)
 
   const { state: drawnState, drawn } = drawFor(state, drawer)
   const matched = state.pendingRank != null && drawn?.rank === state.pendingRank
-  // Only name a card the other player would legitimately see: your own draw,
-  // or a matched draw (the rank was already public from the ask). A regular
-  // miss by the dealer stays hidden — otherwise the log would hand you its
-  // whole hand.
   const line = matched
-    ? drawer === 'player'
-      ? `You fished the ${RANK_LABEL[state.pendingRank!].replace(/s$/, '')} — go again!`
-      : 'The dealer fished what it asked for — go again.'
-    : drawer === 'player'
-      ? `You fished a ${RANK_LABEL[drawn!.rank].replace(/s$/, '')}.`
-      : 'The dealer draws a card.'
+    ? `Seat ${drawer + 1} fished what they asked for — go again.`
+    : `Seat ${drawer + 1} draws a card.`
   const s = bookAndCheck({ ...drawnState, log: push(drawnState.log, line) })
   if (s.phase === 'gameover') return s
 
   if (state.pendingRank != null) {
-    return matched
-      ? toTurn(s, drawer) // fished what you asked for — go again (or draw up / pass if now empty)
-      : toTurn({ ...s, pendingRank: null }, other(drawer))
+    return matched ? toTurn(s, drawer) : toTurn({ ...s, pendingRank: null }, (drawer + 1) % n)
   }
-  // Draw-up.
-  if (handOf(s, drawer).length > 0) return { ...s, phase: askPhase(drawer) }
-  return s.stock.length > 0 ? { ...s, phase: drawPhase(drawer) } : toTurn(s, other(drawer))
+  // Draw-up (empty hand, no rank pending).
+  if (s.hands[drawer].length > 0) return { ...s, phase: 'ask', turn: drawer }
+  return s.stock.length > 0 ? { ...s, phase: 'draw', turn: drawer } : toTurn(s, (drawer + 1) % n)
 }
 
 export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishState {
   switch (action.type) {
     case 'START': {
       const seeded: GoFishState = {
-        ...initGoFish(),
-        playerHand: action.playerHand,
-        aiHand: action.aiHand,
+        ...initGoFish(action.hands.length),
+        hands: action.hands,
         stock: action.stock,
-        log: ['Ask the dealer for a rank you already hold.'],
+        log: ['Ask another player for a rank you already hold.'],
       }
-      return toTurn(bookAndCheck(seeded), 'player')
+      return toTurn(bookAndCheck(seeded), 0)
     }
 
     case 'ASK':
-      return doAsk(state, action.side ?? 'player', action.rank)
+      return doAsk(state, action.seat ?? 0, action.rank, action.target)
 
     case 'DRAW':
-      return doDraw(state, action.side ?? 'player')
+      return doDraw(state, action.seat ?? 0)
 
     case 'AI_STEP': {
-      if (state.phase !== 'aiAsk' && state.phase !== 'aiDraw') return state
+      // Solo-only: seat 1 is always the AI, always targeting seat 0.
+      if (state.turn !== 1 || (state.phase !== 'ask' && state.phase !== 'draw')) return state
       const stepped = { ...state, aiSteps: state.aiSteps + 1 }
-      if (stepped.phase === 'aiDraw') return doDraw(stepped, 'ai')
-      const ask = chooseAiAsk(state.aiHand, state.knownPlayerRanks)
-      if (ask) return doAsk(stepped, 'ai', ask)
+      if (stepped.phase === 'draw') return doDraw(stepped, 1)
+      const ask = chooseAiAsk(state.hands[1], state.knownPlayerRanks)
+      if (ask) return doAsk(stepped, 1, ask, 0)
       // No cards to ask with.
       return stepped.stock.length > 0
-        ? { ...stepped, phase: 'aiDraw', pendingRank: null }
-        : toTurn(stepped, 'player')
+        ? { ...stepped, phase: 'draw', pendingRank: null }
+        : toTurn(stepped, 0)
     }
 
     case 'RESET':
-      return initGoFish()
+      return initGoFish(state.hands.length)
 
     default:
       return state

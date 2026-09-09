@@ -28,6 +28,8 @@ const RANK_SHORT: Record<Rank, string> = {
   KING: 'K',
 }
 const AI_STEP_MS = 950
+const YOU = 0
+const AI = 1
 
 function Books({ label, books, mine }: { label: string; books: Rank[]; mine?: boolean }) {
   return (
@@ -60,7 +62,7 @@ function Books({ label, books, mine }: { label: string; books: Rank[]; mine?: bo
 
 export function GoFish() {
   const deck = useDeck()
-  const [state, dispatch] = useReducer(goFishReducer, undefined, initGoFish)
+  const [state, dispatch] = useReducer(goFishReducer, 2, initGoFish)
   const [dealing, setDealing] = useState(true)
   const didInit = useRef(false)
 
@@ -71,7 +73,7 @@ export function GoFish() {
     try {
       const c = await drawCards(52)
       feedback('deal')
-      dispatch({ type: 'START', playerHand: c.slice(0, 7), aiHand: c.slice(7, 14), stock: c.slice(14) })
+      dispatch({ type: 'START', hands: [c.slice(0, 7), c.slice(7, 14)], stock: c.slice(14) })
     } catch {
       /* surfaced via deck.error */
     } finally {
@@ -86,27 +88,28 @@ export function GoFish() {
   }, [newGame])
 
   useEffect(() => {
-    if (state.phase !== 'aiAsk' && state.phase !== 'aiDraw') return
+    if (state.turn !== AI || (state.phase !== 'ask' && state.phase !== 'draw')) return
     const id = setTimeout(() => {
       feedback('flip')
       dispatch({ type: 'AI_STEP' })
     }, AI_STEP_MS)
     return () => clearTimeout(id)
-  }, [state.phase, state.aiSteps])
+  }, [state.phase, state.turn, state.aiSteps])
 
   useEffect(() => {
-    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
+    if (state.phase === 'gameover') feedback(state.winner === YOU ? 'win' : 'lose')
   }, [state.phase, state.winner])
 
   useRecordGameOnce({
     terminal: state.phase === 'gameover',
     game: 'go-fish',
-    score: state.playerBooks.length,
-    detail: `${state.winner === 'player' ? 'Won' : 'Lost'} ${state.playerBooks.length}–${state.aiBooks.length}`,
+    score: state.books[YOU].length,
+    detail: `${state.winner === YOU ? 'Won' : 'Lost'} ${state.books[YOU].length}–${state.books[AI].length}`,
   })
 
   const over = state.phase === 'gameover'
-  const myRanks = ranksIn(state.playerHand).sort(
+  const myTurn = state.turn === YOU
+  const myRanks = ranksIn(state.hands[YOU]).sort(
     (a, b) => Object.keys(RANK_SHORT).indexOf(a) - Object.keys(RANK_SHORT).indexOf(b),
   )
 
@@ -139,10 +142,10 @@ export function GoFish() {
         <div className="flex flex-col items-center gap-4">
           <div className="flex flex-col items-center gap-1">
             <p className="text-xs uppercase tracking-widest text-gold/80">
-              Dealer — {state.aiHand.length} cards
+              Dealer — {state.hands[AI].length} cards
             </p>
             <div className="flex">
-              {state.aiHand.slice(0, 12).map((_, i) => (
+              {state.hands[AI].slice(0, 12).map((_, i) => (
                 <div key={i} className="-ml-6 w-10 first:ml-0">
                   <Card faceDown />
                 </div>
@@ -151,8 +154,8 @@ export function GoFish() {
           </div>
 
           <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
-            <Books label="Your books" books={state.playerBooks} mine />
-            <Books label="Dealer books" books={state.aiBooks} />
+            <Books label="Your books" books={state.books[YOU]} mine />
+            <Books label="Dealer books" books={state.books[AI]} />
           </div>
 
           {/* The stock — click it to fish when you've missed. */}
@@ -162,11 +165,11 @@ export function GoFish() {
               feedback('flip')
               dispatch({ type: 'DRAW' })
             }}
-            disabled={state.phase !== 'playerDraw'}
+            disabled={!myTurn || state.phase !== 'draw'}
             className="flex flex-col items-center gap-1 disabled:opacity-60"
             aria-label="Draw from the stock"
           >
-            <div className={`w-16 ${state.phase === 'playerDraw' ? 'animate-pulse-match' : ''}`}>
+            <div className={`w-16 ${myTurn && state.phase === 'draw' ? 'animate-pulse-match' : ''}`}>
               <Card faceDown />
             </div>
             <span className="text-xs text-card/70">stock {state.stock.length}</span>
@@ -178,7 +181,7 @@ export function GoFish() {
 
           {/* Player hand */}
           <div className="flex flex-wrap justify-center gap-1">
-            {state.playerHand.map((c, i) => (
+            {state.hands[YOU].map((c, i) => (
               <div key={`${c.code}-${i}`} className="w-12 sm:w-14">
                 <Card card={c} faceDown={false} />
               </div>
@@ -188,13 +191,13 @@ export function GoFish() {
           {!over ? (
             <div className="flex flex-col items-center gap-2">
               <p className="text-sm text-card/70">
-                {state.phase === 'playerAsk'
+                {myTurn && state.phase === 'ask'
                   ? 'Ask the dealer for:'
-                  : state.phase === 'playerDraw'
+                  : myTurn && state.phase === 'draw'
                     ? 'Go fish — tap the stock to draw.'
                     : 'Dealer is thinking…'}
               </p>
-              {state.phase === 'playerDraw' ? (
+              {myTurn && state.phase === 'draw' ? (
                 <Button
                   size="lg"
                   variant="accent"
@@ -213,9 +216,9 @@ export function GoFish() {
                       variant="gold"
                       onClick={() => {
                         feedback('flip')
-                        dispatch({ type: 'ASK', rank: r })
+                        dispatch({ type: 'ASK', rank: r, target: AI })
                       }}
-                      disabled={state.phase !== 'playerAsk'}
+                      disabled={!myTurn || state.phase !== 'ask'}
                     >
                       {RANK_SHORT[r]}
                     </Button>
@@ -226,12 +229,12 @@ export function GoFish() {
           ) : (
             <div className="flex flex-col items-center gap-3">
               <p className="font-display text-xl text-gold">
-                {state.winner === 'player'
-                  ? `You win ${state.playerBooks.length}–${state.aiBooks.length}!`
-                  : `The dealer wins ${state.aiBooks.length}–${state.playerBooks.length}.`}
+                {state.winner === YOU
+                  ? `You win ${state.books[YOU].length}–${state.books[AI].length}!`
+                  : `The dealer wins ${state.books[AI].length}–${state.books[YOU].length}.`}
               </p>
-              {state.playerBooks.length >= 1 && (
-                <ScoreSubmit game="go-fish" score={state.playerBooks.length} />
+              {state.books[YOU].length >= 1 && (
+                <ScoreSubmit game="go-fish" score={state.books[YOU].length} />
               )}
               <Button size="lg" variant="gold" onClick={() => void newGame()}>
                 Play again

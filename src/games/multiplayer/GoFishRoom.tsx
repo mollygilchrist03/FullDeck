@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from '../../components/Button.js'
 import { Card } from '../../components/Card.js'
 import type { Rank } from '../../types/card.js'
@@ -24,43 +25,62 @@ const ORDER = Object.keys(RANK_SHORT)
 
 export function GoFishRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as GoFishState
-  const seat = view.youSeat ?? 0
-  const spectator = view.youSeat === null
-  const side = seat === 0 ? 'player' : 'ai'
-  const myHand = side === 'player' ? s.playerHand : s.aiHand
-  const theirHand = side === 'player' ? s.aiHand : s.playerHand
-  const myBooks = side === 'player' ? s.playerBooks : s.aiBooks
-  const theirBooks = side === 'player' ? s.aiBooks : s.playerBooks
-  const myAsk = side === 'player' ? 'playerAsk' : 'aiAsk'
-  const myDraw = side === 'player' ? 'playerDraw' : 'aiDraw'
+  const seat = view.youSeat
+  const spectator = seat === null
+  const myHand = seat !== null ? s.hands[seat] : []
+  const myBooks = seat !== null ? s.books[seat] : []
   const over = s.phase === 'gameover'
-  const canAsk = !spectator && s.phase === myAsk
-  const canDraw = !spectator && s.phase === myDraw
+  const canAsk = !spectator && s.phase === 'ask' && s.turn === seat
+  const canDraw = !spectator && s.phase === 'draw' && s.turn === seat
   const myRanks = ranksIn(myHand).sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b))
+  const others = s.hands.map((_, i) => i).filter((i) => i !== seat)
+
+  const [askRank, setAskRank] = useState<Rank | null>(null)
+
+  const startAsk = (rank: Rank) => {
+    if (seat === null) return
+    // Only one possible person to ask — skip the target picker entirely.
+    if (others.length === 1) {
+      send({ type: 'ASK', rank, target: others[0], seat })
+      return
+    }
+    setAskRank(rank)
+  }
+  const finishAsk = (target: number) => {
+    if (seat === null || askRank === null) return
+    send({ type: 'ASK', rank: askRank, target, seat })
+    setAskRank(null)
+  }
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="flex flex-col items-center gap-1">
-        <p className="text-xs uppercase tracking-widest text-gold/80">
-          Opponent — {theirHand.length} cards · {theirBooks.length} books
-        </p>
-        <div className="flex">
-          {theirHand.slice(0, 14).map((_, i) => (
-            <div key={i} className="-ml-6 w-9 first:ml-0">
-              <Card faceDown />
+      <div className="flex flex-wrap justify-center gap-4">
+        {s.hands.map((hand, i) => {
+          if (i === seat) return null
+          return (
+            <div key={i} className="flex flex-col items-center gap-1">
+              <p className="text-xs uppercase tracking-widest text-gold/80">
+                Seat {i + 1} — {hand.length} card{hand.length === 1 ? '' : 's'} · {s.books[i].length} books
+              </p>
+              <div className="flex">
+                {hand.slice(0, 14).map((_, ci) => (
+                  <div key={ci} className="-ml-6 w-9 first:ml-0">
+                    <Card faceDown />
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
 
       <div className="flex w-full max-w-md justify-around text-center text-sm">
-        <span className="text-card/70">Their books: {theirBooks.length}</span>
         <span className="text-card/70">Your books: {myBooks.length}</span>
       </div>
 
       <button
         type="button"
-        onClick={() => send({ type: 'DRAW', side })}
+        onClick={() => seat !== null && send({ type: 'DRAW', seat })}
         disabled={!canDraw || sending}
         className="flex flex-col items-center gap-1 disabled:opacity-60"
         aria-label="Fish from the stock"
@@ -73,11 +93,13 @@ export function GoFishRoom({ view, send, sending }: MpBoardProps) {
 
       <p className="min-h-5 max-w-md text-center text-sm text-card/75" role="status" aria-live="polite">
         {over
-          ? s.winner === side
-            ? `You win ${myBooks.length}–${theirBooks.length}!`
-            : `Your opponent wins ${theirBooks.length}–${myBooks.length}.`
+          ? s.winner === seat
+            ? `You win with ${myBooks.length} books!`
+            : `Seat ${(s.winner ?? 0) + 1} wins.`
           : canAsk
-            ? 'Your turn — ask for a rank you hold.'
+            ? askRank
+              ? 'Who do you want to ask?'
+              : 'Your turn — ask for a rank you hold.'
             : canDraw
               ? 'Go fish — tap the stock to draw.'
               : s.log[s.log.length - 1]}
@@ -91,15 +113,24 @@ export function GoFishRoom({ view, send, sending }: MpBoardProps) {
         ))}
       </div>
 
-      {canAsk && (
+      {canAsk && askRank && (
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
+            {others.map((i) => (
+              <Button key={i} variant="gold" onClick={() => finishAsk(i)} disabled={sending}>
+                Seat {i + 1}
+              </Button>
+            ))}
+          </div>
+          <Button variant="ghost" onClick={() => setAskRank(null)} disabled={sending}>
+            Cancel
+          </Button>
+        </div>
+      )}
+      {canAsk && !askRank && (
         <div className="flex flex-wrap justify-center gap-2">
           {myRanks.map((r) => (
-            <Button
-              key={r}
-              variant="gold"
-              onClick={() => send({ type: 'ASK', rank: r, side })}
-              disabled={sending}
-            >
+            <Button key={r} variant="gold" onClick={() => startAsk(r)} disabled={sending}>
               {RANK_SHORT[r]}
             </Button>
           ))}
@@ -109,7 +140,7 @@ export function GoFishRoom({ view, send, sending }: MpBoardProps) {
         <Button
           size="lg"
           variant="accent"
-          onClick={() => send({ type: 'DRAW', side })}
+          onClick={() => seat !== null && send({ type: 'DRAW', seat })}
           disabled={sending}
         >
           🎣 Go fish

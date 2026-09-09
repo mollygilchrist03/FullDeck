@@ -112,24 +112,27 @@ instant the room's `version` bumps. War, Slapjack, Old Maid, Crazy Eights, Go
 Fish, Trash, and Hold'em are all playable in a room (High-Low stays solo).
 Room size is a per-game declaration — `SEAT_RANGE` in
 [`lib/multiplayer.ts`](src/lib/multiplayer.ts) — not something the room
-plumbing assumes: War, Go Fish, and Trash are two-player only (their
-actual rules are head-to-head — War splits one deck exactly in half;
-Go Fish's "ask the opponent" has nobody else to name as a target),
-while Slapjack, Crazy Eights, Old Maid, and Hold'em all scale to a 2-6
-seat table, because their core mechanics already generalize — a slap is
-a race against shared table state rather than a pairwise comparison,
-Crazy Eights' turn order and "two passes ends it" rule are just a
-rotation and a full-lap count once seats are an array instead of a named
-pair, Old Maid's "draw from the dealer" turns out to already mean "draw
-from whoever's next" (2-player just made "next" and "not-me" the same
-seat by coincidence), and Hold'em's engine already addresses players by
-seat rather than a role. Solo-vs-AI for War/Go Fish/Trash is untouched —
-their reducers carry an optional `side` per move, the AI move-picker
-just dispatches side `'ai'`, and a human in that seat sends the same
-actions. Slapjack, Crazy Eights, Old Maid, and Hold'em instead address
-seats by index from the start, so the identical engine runs a 2-seat
-solo table and a bigger online one; solo Slapjack, Crazy Eights, and Old
-Maid still deal exactly 2 hands (their AI opponent is single-player
+plumbing assumes: War and Trash are two-player only (War's rules are
+head-to-head as designed — splitting one deck exactly in half — and
+Trash's 10-card row genuinely doesn't fit more than 4 players in one
+52-card deck), while Slapjack, Crazy Eights, Old Maid, Go Fish, and
+Hold'em all scale to a 2-6 seat table, because their core mechanics
+already generalize — a slap is a race against shared table state rather
+than a pairwise comparison, Crazy Eights' turn order and "two passes
+ends it" rule are just a rotation and a full-lap count once seats are an
+array instead of a named pair, Old Maid's "draw from the dealer" turns
+out to already mean "draw from whoever's next" (2-player just made
+"next" and "not-me" the same seat by coincidence), Go Fish's "ask the
+opponent" needed a genuinely new explicit target — the 2-player version
+had no target field at all, since there was only ever one possible
+answer — and Hold'em's engine already addresses players by seat rather
+than a role. Solo-vs-AI for War/Trash is untouched — their reducers
+carry an optional `side` per move, the AI move-picker just dispatches
+side `'ai'`, and a human in that seat sends the same actions. Slapjack,
+Crazy Eights, Old Maid, Go Fish, and Hold'em instead address seats by
+index from the start, so the identical engine runs a 2-seat solo table
+and a bigger online one; solo Slapjack, Crazy Eights, Old Maid, and Go
+Fish still deal exactly 2 hands (their AI opponent is single-player
 only, not multi-seat).
 
 **Sound and haptics.** Deal, flip, slap, win, and lose each get a short cue,
@@ -323,7 +326,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **262 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **269 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
   profanity filter, auth input rules, leaderboard validation/formatting, and
@@ -398,10 +401,9 @@ and login still work, there's just no real email in the loop.
 
 Things worth adding if this grew past a portfolio piece:
 
-- War, Go Fish, and Trash are still fixed at 2 seats. War's rules are
-  genuinely head-to-head as designed (splitting one deck exactly in
-  half); Go Fish's "ask the opponent" has nobody else to name as the
-  target without a real target-picker added to both the action and the
-  UI. Trash's row size (10 cards each) additionally caps it at 4 players
-  even if the seat-count plumbing were generalized — 6×10 doesn't fit in
-  one 52-card deck.
+- War and Trash are still fixed at 2 seats. War's rules are genuinely
+  head-to-head as designed (splitting one deck exactly in half) — any
+  N-player version would be a house-rule variant, not an extension.
+  Trash's row size (10 cards each) caps it at 4 players in one 52-card
+  deck (6×10 doesn't fit); reaching further would mean shrinking the row
+  below Ace–10, a real rule change, not just a seat-count widening.

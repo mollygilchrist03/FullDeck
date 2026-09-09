@@ -124,21 +124,17 @@ const crazyEights: GameServer = {
 }
 
 const goFish: GameServer = {
-  deal: (c) =>
-    goFishReducer(initGoFish(), {
-      type: 'START',
-      playerHand: c.slice(0, 7),
-      aiHand: c.slice(7, 14),
-      stock: c.slice(14),
-    }),
+  deal: (c, seatCount) => {
+    const hands: Card[][] = []
+    for (let i = 0; i < seatCount; i += 1) hands.push(c.slice(i * 7, (i + 1) * 7))
+    const stock = c.slice(seatCount * 7)
+    return goFishReducer(initGoFish(seatCount), { type: 'START', hands, stock })
+  },
   reduce: goFishReducer,
   authorize: (s, seat, a) => {
-    if (s.phase === 'gameover') return false
-    const want = role(seat)
-    const side = a?.side ?? 'player'
-    if (side !== want) return false
-    if (a?.type === 'ASK') return s.phase === (want === 'player' ? 'playerAsk' : 'aiAsk')
-    if (a?.type === 'DRAW') return s.phase === (want === 'player' ? 'playerDraw' : 'aiDraw')
+    if (s.phase === 'gameover' || a?.seat !== seat) return false
+    if (a?.type === 'ASK') return s.phase === 'ask' && s.turn === seat
+    if (a?.type === 'DRAW') return s.phase === 'draw' && s.turn === seat
     return false
   },
   isOver: (s) => s.phase === 'gameover',
