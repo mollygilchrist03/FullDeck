@@ -12,10 +12,12 @@ import { removeOneQueen } from './oldMaidLogic.js'
 import { initOldMaid, oldMaidReducer } from './oldMaidReducer.js'
 
 const AI_STEP_MS = 900
+const YOU = 0
+const AI = 1
 
 export function OldMaid() {
   const deck = useDeck()
-  const [state, dispatch] = useReducer(oldMaidReducer, undefined, initOldMaid)
+  const [state, dispatch] = useReducer(oldMaidReducer, 2, initOldMaid)
   const [dealing, setDealing] = useState(true)
   const didInit = useRef(false)
 
@@ -26,7 +28,7 @@ export function OldMaid() {
     try {
       const cards = removeOneQueen(await drawCards(52))
       feedback('deal')
-      dispatch({ type: 'START', playerHand: cards.slice(0, 26), aiHand: cards.slice(26) })
+      dispatch({ type: 'START', hands: [cards.slice(0, 26), cards.slice(26)] })
     } catch {
       /* surfaced via deck.error */
     } finally {
@@ -42,30 +44,30 @@ export function OldMaid() {
 
   // The dealer draws a random card from your hand on its turn.
   useEffect(() => {
-    if (state.phase !== 'aiTurn') return
+    if (state.phase !== 'turn' || state.turn !== AI) return
     const id = setTimeout(() => {
       feedback('flip')
-      dispatch({ type: 'DRAW', index: Math.floor(Math.random() * state.playerHand.length) })
+      dispatch({ type: 'DRAW', index: Math.floor(Math.random() * state.hands[YOU].length) })
     }, AI_STEP_MS)
     return () => clearTimeout(id)
-  }, [state.phase, state.playerHand.length])
+  }, [state.phase, state.turn, state.hands])
 
   useEffect(() => {
-    if (state.phase === 'gameover') feedback(state.winner === 'player' ? 'win' : 'lose')
-  }, [state.phase, state.winner])
+    if (state.phase === 'gameover') feedback(state.loser === AI ? 'win' : 'lose')
+  }, [state.phase, state.loser])
 
   useRecordGameOnce({
     terminal: state.phase === 'gameover',
     game: 'old-maid',
-    score: state.winner === 'player' ? state.turnsTaken : 0,
+    score: state.loser === AI ? state.turnsTaken : 0,
     detail:
-      state.winner === 'player'
+      state.loser === AI
         ? `Won in ${state.turnsTaken} draws`
         : 'Lost — held the Old Maid',
   })
 
   const over = state.phase === 'gameover'
-  const myTurn = state.phase === 'playerTurn'
+  const myTurn = state.phase === 'turn' && state.turn === YOU
 
   return (
     <Layout
@@ -96,10 +98,10 @@ export function OldMaid() {
         <div className="flex flex-col items-center gap-4">
           <div className="flex flex-col items-center gap-1">
             <p className="text-xs uppercase tracking-widest text-gold/80">
-              Dealer — {state.aiHand.length} cards · {state.aiDiscards.length} pairs down
+              Dealer — {state.hands[AI].length} cards · {state.discards[AI].length} pairs down
             </p>
             <div className="flex flex-wrap justify-center">
-              {state.aiHand.map((_, i) => (
+              {state.hands[AI].map((_, i) => (
                 <button
                   key={i}
                   type="button"
@@ -125,10 +127,10 @@ export function OldMaid() {
 
           <div className="flex flex-col items-center gap-1">
             <p className="text-xs uppercase tracking-widest text-gold/80">
-              You — {state.playerDiscards.length} pairs down
+              You — {state.discards[YOU].length} pairs down
             </p>
             <div className="flex flex-wrap justify-center gap-1">
-              {state.playerHand.map((c, i) => (
+              {state.hands[YOU].map((c, i) => (
                 <div key={`${c.code}-${i}`} className="w-11 sm:w-12">
                   <Card card={c} faceDown={false} />
                 </div>
@@ -139,11 +141,11 @@ export function OldMaid() {
           {over && (
             <div className="flex flex-col items-center gap-3">
               <p className="font-display text-xl text-gold">
-                {state.winner === 'player'
+                {state.loser === AI
                   ? 'The dealer is the Old Maid — you win!'
                   : "You're stuck with the Old Maid. You lose."}
               </p>
-              {state.winner === 'player' && state.turnsTaken >= 1 && (
+              {state.loser === AI && state.turnsTaken >= 1 && (
                 <ScoreSubmit game="old-maid" score={state.turnsTaken} />
               )}
               <Button size="lg" variant="gold" onClick={() => void newGame()}>

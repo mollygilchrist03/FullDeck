@@ -86,17 +86,12 @@ const slapjack: GameServer = {
 }
 
 const oldMaid: GameServer = {
-  deal: (raw) => {
+  deal: (raw, seatCount) => {
     const c = removeOneQueen(raw)
-    return oldMaidReducer(initOldMaid(), {
-      type: 'START',
-      playerHand: c.slice(0, 26),
-      aiHand: c.slice(26),
-    })
+    return oldMaidReducer(initOldMaid(seatCount), { type: 'START', hands: splitPiles(c, seatCount) })
   },
   reduce: oldMaidReducer,
-  authorize: (s, seat, a) =>
-    a?.type === 'DRAW' && s.phase !== 'gameover' && s.turn === role(seat),
+  authorize: (s, seat, a) => a?.type === 'DRAW' && s.phase !== 'gameover' && s.turn === seat,
   isOver: (s) => s.phase === 'gameover',
 }
 
