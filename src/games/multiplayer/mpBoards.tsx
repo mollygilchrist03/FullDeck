@@ -8,11 +8,14 @@ import { OldMaidRoom } from './OldMaidRoom.js'
 import { CrazyEightsRoom } from './CrazyEightsRoom.js'
 import { GoFishRoom } from './GoFishRoom.js'
 import { TrashRoom } from './TrashRoom.js'
+import { HoldemRoom } from './HoldemRoom.js'
 
 export interface MpBoardProps {
   view: RoomView
   send: (action: unknown) => void
   onRematch: () => void
+  /** Deal the next hand within the same match (Hold'em only). */
+  onNextHand?: () => void
   /** True while an action of ours is in flight — disable buttons to avoid double-sends. */
   sending: boolean
 }
@@ -58,6 +61,7 @@ const BOARDS: Partial<Record<MpGameKey, (p: MpBoardProps) => ReactNode>> = {
   'crazy-eights': CrazyEightsRoom,
   'go-fish': GoFishRoom,
   trash: TrashRoom,
+  holdem: HoldemRoom,
 }
 
 export function MpBoard(props: MpBoardProps): ReactNode {

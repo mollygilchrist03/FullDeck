@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout.js'
 import { Button } from '../../components/Button.js'
 import { GAMES } from '../../lib/leaderboard.js'
-import { MP_GAMES, normalizeCode, type MpGameKey } from '../../lib/multiplayer.js'
+import { MP_GAMES, normalizeCode, SEAT_RANGE, type MpGameKey } from '../../lib/multiplayer.js'
 import { createRoom, joinRoom } from '../../hooks/useRoom.js'
 
 const NAME_KEY = 'fulldeck:name'
@@ -26,9 +26,11 @@ export function Multiplayer() {
   const nav = useNavigate()
   const [name, setName] = useState(loadName)
   const [game, setGame] = useState<MpGameKey>(MP_GAMES[0])
+  const [size, setSize] = useState(SEAT_RANGE[MP_GAMES[0]].min)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const range = SEAT_RANGE[game]
 
   const go = async (fn: () => Promise<string | void>, then: (code?: string) => void) => {
     const trimmed = name.trim()
@@ -51,7 +53,7 @@ export function Multiplayer() {
 
   const host = () =>
     go(
-      () => createRoom(game, name.trim()),
+      () => createRoom(game, name.trim(), size),
       (c) => c && nav(`/room/${c}`),
     )
 
@@ -84,13 +86,18 @@ export function Multiplayer() {
         <div className="rounded-2xl border border-gold/30 bg-felt p-5">
           <h2 className="font-display text-lg font-bold text-card">Host a game</h2>
           <p className="mt-1 text-sm text-card/70">
-            You get a 6-character code to share. Two players, same link.
+            You get a 6-character code to share.{' '}
+            {range.max > range.min ? `${range.min}-${range.max} players, same link.` : 'Two players, same link.'}
           </p>
           <label className="mt-3 flex flex-col gap-1 text-sm text-card/80">
             Game
             <select
               value={game}
-              onChange={(e) => setGame(e.target.value as MpGameKey)}
+              onChange={(e) => {
+                const next = e.target.value as MpGameKey
+                setGame(next)
+                setSize(SEAT_RANGE[next].min)
+              }}
               className="rounded-lg border border-gold/40 bg-felt px-3 py-2 text-card focus:border-gold focus:outline-none"
             >
               {MP_GAMES.map((k) => (
@@ -100,6 +107,22 @@ export function Multiplayer() {
               ))}
             </select>
           </label>
+          {range.max > range.min && (
+            <label className="mt-3 flex flex-col gap-1 text-sm text-card/80">
+              Seats
+              <select
+                value={size}
+                onChange={(e) => setSize(Number(e.target.value))}
+                className="rounded-lg border border-gold/40 bg-felt px-3 py-2 text-card focus:border-gold focus:outline-none"
+              >
+                {Array.from({ length: range.max - range.min + 1 }, (_, i) => range.min + i).map((n) => (
+                  <option key={n} value={n}>
+                    {n} players
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <Button variant="gold" className="mt-4 w-full" onClick={host} disabled={busy}>
             Create room
           </Button>

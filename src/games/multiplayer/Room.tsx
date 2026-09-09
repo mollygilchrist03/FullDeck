@@ -39,11 +39,12 @@ function ShareLine({ code }: { code: string }) {
 
 export function Room() {
   const code = normalizeCode(useParams().code ?? '')
-  const { room, error, sending, send, start, rematch } = useRoom(code)
+  const { room, error, sending, send, start, rematch, nextHand } = useRoom(code)
   const [name, setName] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinErr, setJoinErr] = useState<string | null>(null)
   const seatedHere = loadSeatId(code) != null
+  const openSeats = room?.seats.filter((s) => s === null).length ?? 0
 
   if (code.length !== 6) {
     return (
@@ -102,7 +103,7 @@ export function Room() {
         </div>
       ) : room.phase === 'lobby' ? (
         <div className="mx-auto flex max-w-md flex-col items-center gap-6">
-          <div className="flex w-full justify-around text-center">
+          <div className="flex w-full flex-wrap justify-around gap-3 text-center">
             {room.seats.map((s, i) => (
               <div key={i}>
                 <p className="text-xs uppercase tracking-widest text-gold/80">Seat {i + 1}</p>
@@ -112,13 +113,8 @@ export function Room() {
           </div>
           <ShareLine code={code} />
           {room.youHost ? (
-            <Button
-              size="lg"
-              variant="gold"
-              disabled={sending || room.seats.some((s) => s === null)}
-              onClick={() => void start()}
-            >
-              {room.seats.some((s) => s === null) ? 'Waiting for player 2…' : 'Start game'}
+            <Button size="lg" variant="gold" disabled={sending || openSeats > 0} onClick={() => void start()}>
+              {openSeats > 0 ? `Waiting for ${openSeats} more player${openSeats === 1 ? '' : 's'}…` : 'Start game'}
             </Button>
           ) : (
             <p className="text-sm text-card/70">Waiting for the host to start…</p>
@@ -130,6 +126,7 @@ export function Room() {
             view={room}
             send={(a) => void send(a)}
             onRematch={() => void rematch()}
+            onNextHand={() => void nextHand()}
             sending={sending}
           />
           {room.phase === 'done' && room.youHost && (
