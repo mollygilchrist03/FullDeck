@@ -124,8 +124,14 @@ auto-post switch, otherwise one click with the name pre-filled. Auth is
 hand-rolled on the same Postgres: scrypt password hashing with a per-user
 salt and a timing-safe compare, session tokens that live in an HttpOnly
 cookie but are stored only as their SHA-256, and a cross-instance login
-throttle. Nothing about accounts is required — with no database, or without
-the Google client vars, those paths just report they aren't configured.
+throttle. Registering sends a verification email (Resend); a signed-in but
+unverified account can resend it, and a forgotten password is recovered
+through a `/account/reset` emailed link — both are single-use tokens stored
+hashed with an expiry (24h to verify, 1h to reset). With no mail provider
+configured, sending is a no-op that just logs the link, so the flows stay
+testable and nothing about accounts is blocked. Nothing about accounts is
+required — with no database, or without the Google client vars, those paths
+just report they aren't configured.
 
 ## Notable engineering decisions
 
@@ -279,7 +285,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **237 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **239 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
   profanity filter, auth input rules, leaderboard validation/formatting, and
@@ -297,7 +303,7 @@ and free of any React or network concerns.
 | Framework | React 19 + TypeScript (strict) |
 | Build | Vite |
 | Styling | Tailwind CSS v4 (palette defined in `@theme`) |
-| Routing | React Router — `/`, ten game routes (code-split with `React.lazy`), `/leaderboard`, `/multiplayer`, `/room/:code` |
+| Routing | React Router — `/`, ten game routes (code-split with `React.lazy`), `/leaderboard`, `/multiplayer`, `/room/:code`, `/account`, `/account/verify`, `/account/reset` |
 | State | `useReducer` per game; `useDeck` custom hook for the shared deck |
 | Tests | Vitest — pure-logic unit tests (Node) + component/interaction tests (jsdom, React Testing Library) |
 | Card data | Deck of Cards API (free, no key) |
@@ -330,11 +336,12 @@ The repo is connected to Vercel, so a push to `master` is a production deploy.
 
 **Database.** The live demo is wired to a Neon Postgres store (created from the
 Vercel project's **Storage** tab, which sets `DATABASE_URL`); the tables —
-`scores`, `submission_log`, `rooms`, `users`, `sessions`, `game_results`,
-`login_attempts` — come from [`db/schema.ts`](db/schema.ts) via `npm run
-db:push`. To run your own, do the same and set `DATABASE_URL` for all
-environments. Until that's done the site still deploys and runs — the
-leaderboard, multiplayer, and accounts just report that they aren't configured.
+`scores`, `submission_log`, `rooms`, `users`, `sessions`, `email_tokens`,
+`game_results`, `login_attempts` — come from [`db/schema.ts`](db/schema.ts)
+via `npm run db:push`. To run your own, do the same and set `DATABASE_URL`
+for all environments. Until that's done the site still deploys and runs —
+the leaderboard, multiplayer, and accounts just report that they aren't
+configured.
 
 **Google sign-in** is optional on top of that: create an OAuth 2.0 Web
 Application client in the Google Cloud console, register
@@ -343,15 +350,15 @@ redirect URI, and set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in the
 Vercel env (see [`.env.example`](.env.example)). Without them, email/password
 still works and the Google button just doesn't render.
 
+**Verification/reset email** is also optional: set `RESEND_API_KEY` and
+`MAIL_FROM` (see [`.env.example`](.env.example)) to send through
+[Resend](https://resend.com). Without them, `server/mail.ts` just logs the
+verify/reset link to the server console instead of emailing it — registration
+and login still work, there's just no real email in the loop.
+
 ## What's next
 
 Things worth adding if this grew past a portfolio piece:
 
-- Email verification and password reset (both need a mail provider, so the
-  current accounts are usable the moment they're created and there's no
-  recovery flow).
-- A CI-driven Lighthouse/bundle-size budget so the route-level code-splitting
-  doesn't quietly regress as games grow.
-- A proper NL min-raise rule (currently any raise above the current bet is
-  legal; real no-limit requires raising by at least the size of the previous
-  bet or raise) and side pots if this ever became more than heads-up.
+- Side pots for Hold'em if it ever became more than heads-up (the betting
+  engine currently assumes exactly two players).
