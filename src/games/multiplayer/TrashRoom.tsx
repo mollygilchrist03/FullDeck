@@ -38,21 +38,21 @@ function Row({
 
 export function TrashRoom({ view, send, sending }: MpBoardProps) {
   const s = view.state as TrashState
-  const seat = view.youSeat ?? 0
-  const spectator = view.youSeat === null
-  const side = seat === 0 ? 'player' : 'ai'
-  const mySlots = side === 'player' ? s.playerSlots : s.aiSlots
-  const theirSlots = side === 'player' ? s.aiSlots : s.playerSlots
-  const mySize = side === 'player' ? s.playerSize : s.aiSize
-  const theirSize = side === 'player' ? s.aiSize : s.playerSize
+  const seat = view.youSeat
+  const spectator = seat === null
   const over = s.phase === 'gameover'
-  const myTurn = !spectator && !over && s.turn === side && s.phase === (side === 'player' ? 'playerTurn' : 'aiTurn')
-  const myWild = !spectator && s.phase === 'wildChoice' && s.turn === side
+  const myTurn = !spectator && !over && s.phase === 'turn' && s.turn === seat
+  const myWild = !spectator && s.phase === 'wildChoice' && s.turn === seat
   const discardTop = s.discard[s.discard.length - 1]
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <Row slots={theirSlots} label={`Opponent — lays ${theirSize}`} />
+      <div className="flex flex-wrap justify-center gap-4">
+        {s.slots.map((row, i) => {
+          if (i === seat) return null
+          return <Row key={i} slots={row} label={`Seat ${i + 1} — lays ${s.sizes[i]}`} />
+        })}
+      </div>
 
       <div className="flex items-end gap-4">
         <div className="flex flex-col items-center gap-1">
@@ -81,17 +81,19 @@ export function TrashRoom({ view, send, sending }: MpBoardProps) {
         )}
       </div>
 
-      <Row
-        slots={mySlots}
-        label={`You — lay ${mySize}`}
-        onPick={myWild && !sending ? (i) => send({ type: 'PLACE_WILD', slot: i, side }) : undefined}
-      />
+      {seat !== null && (
+        <Row
+          slots={s.slots[seat]}
+          label={`You — lay ${s.sizes[seat]}`}
+          onPick={myWild && !sending ? (i) => send({ type: 'PLACE_WILD', slot: i, seat }) : undefined}
+        />
+      )}
 
       <p className="min-h-5 max-w-md text-center text-sm text-card/75" role="status" aria-live="polite">
         {over
-          ? s.matchWinner === side
+          ? s.matchWinner === seat
             ? 'You cleared your row — you win!'
-            : 'Your opponent cleared their row. You lose.'
+            : `Seat ${(s.matchWinner ?? 0) + 1} cleared their row.`
           : myWild
             ? 'Queen is wild — tap an open slot.'
             : myTurn
@@ -104,7 +106,7 @@ export function TrashRoom({ view, send, sending }: MpBoardProps) {
           <Button
             size="lg"
             variant="accent"
-            onClick={() => send({ type: 'DRAW', side })}
+            onClick={() => send({ type: 'DRAW', seat })}
             disabled={sending}
           >
             Draw
@@ -112,7 +114,7 @@ export function TrashRoom({ view, send, sending }: MpBoardProps) {
           <Button
             size="lg"
             variant="ghost"
-            onClick={() => send({ type: 'TAKE_DISCARD', side })}
+            onClick={() => send({ type: 'TAKE_DISCARD', seat })}
             disabled={!discardTop || sending}
           >
             Take discard

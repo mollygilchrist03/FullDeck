@@ -31,111 +31,114 @@ describe('slot helpers', () => {
 
 const deadLayout = (n: number): Card[] => hand(...Array.from({ length: n }, () => 'KING' as const))
 
+/** Seat 0 = "you", seat 1 = "the dealer" for 2-seat setups. */
 const start = (stock: Card[], playerN = 10, aiN = 10): TrashState =>
-  trashReducer(initTrash(), {
+  trashReducer(initTrash(2), {
     type: 'START',
     stock,
-    playerFaceDown: deadLayout(playerN),
-    aiFaceDown: deadLayout(aiN),
+    faceDown: [deadLayout(playerN), deadLayout(aiN)],
   })
 
 describe('trashReducer', () => {
-  it('START lays out both sides face down', () => {
+  it('START lays out every seat face down', () => {
     const s = start([card('ACE')])
-    expect(s.playerSlots).toHaveLength(10)
-    expect(s.playerSlots.every((sl) => sl.locked === null)).toBe(true)
-    expect(s.phase).toBe('playerTurn')
+    expect(s.slots[0]).toHaveLength(10)
+    expect(s.slots[0].every((sl) => sl.locked === null)).toBe(true)
+    expect(s.phase).toBe('turn')
+    expect(s.turn).toBe(0)
   })
 
   it('drawing a positional card locks its slot', () => {
     const s = trashReducer(start([card('ACE')]), { type: 'DRAW' })
     // ace -> slot 1; the swapped-up card is a King (dead) so the turn ends.
-    expect(s.playerSlots[0].locked?.rank).toBe('ACE')
-    expect(s.phase).toBe('aiTurn')
-    expect(s.playerTurns).toBe(1)
+    expect(s.slots[0][0].locked?.rank).toBe('ACE')
+    expect(s.phase).toBe('turn')
+    expect(s.turn).toBe(1)
+    expect(s.turnsTaken).toBe(1)
     expect(s.discard.at(-1)?.rank).toBe('KING')
   })
 
   it('drawing a dead card just ends the turn', () => {
     const s = trashReducer(start([card('KING')]), { type: 'DRAW' })
-    expect(s.phase).toBe('aiTurn')
-    expect(s.playerSlots.every((sl) => sl.locked === null)).toBe(true)
+    expect(s.phase).toBe('turn')
+    expect(s.turn).toBe(1)
+    expect(s.slots[0].every((sl) => sl.locked === null)).toBe(true)
   })
 
-  it('a queen asks the player to choose a slot', () => {
+  it('a queen asks the acting seat to choose a slot', () => {
     let s = trashReducer(start([card('QUEEN')]), { type: 'DRAW' })
     expect(s.phase).toBe('wildChoice')
     s = trashReducer(s, { type: 'PLACE_WILD', slot: 3 })
-    expect(s.playerSlots[3].locked?.rank).toBe('QUEEN')
+    expect(s.slots[0][3].locked?.rank).toBe('QUEEN')
   })
 
   it('completing a one-card layout wins the match', () => {
     const s = trashReducer(start([card('ACE')], 1, 2), { type: 'DRAW' })
     expect(s.phase).toBe('gameover')
-    expect(s.matchWinner).toBe('player')
+    expect(s.matchWinner).toBe(0)
   })
 
-  it('a dead deck for both sides ends the round for the fuller layout', () => {
+  it('a dead deck for everyone ends the round for the fuller layout', () => {
     const open = { faceDown: card('2'), locked: null }
     const done = { faceDown: card('2'), locked: card('ACE') }
     let s: TrashState = {
-      ...initTrash(),
-      phase: 'playerTurn',
-      turn: 'player',
-      playerSlots: [open, open],
-      playerSize: 2,
-      aiSlots: [done, open], // AI has fewer open slots
-      aiSize: 2,
+      ...initTrash(2),
+      phase: 'turn',
+      turn: 0,
+      slots: [
+        [open, open],
+        [done, open], // seat 1 has fewer open slots
+      ],
+      sizes: [2, 2],
       stock: [],
       discard: [card('KING')],
     }
     s = trashReducer(s, { type: 'DRAW' }) // nothing to draw -> forced pass
     expect(s.stalePasses).toBe(1)
-    expect(s.phase).toBe('aiTurn')
+    expect(s.phase).toBe('turn')
+    expect(s.turn).toBe(1)
     s = trashReducer(s, { type: 'AI_STEP' }) // second forced pass -> resolve
     expect(s.phase).toBe('roundOver')
-    expect(s.roundWinner).toBe('ai')
+    expect(s.roundWinner).toBe(1)
   })
 
   it('clearing a bigger layout ends the round and shrinks the winner', () => {
     // size 2: draw an ace (slot 1) then a 2 (slot 2). Face-down cards are the 2 and ace.
-    let s = trashReducer(initTrash(), {
+    let s = trashReducer(initTrash(2), {
       type: 'START',
       stock: [card('ACE'), card('2')],
-      playerFaceDown: [card('2'), card('ACE')], // slot 0 hides a 2, slot 1 hides an ace
-      aiFaceDown: deadLayout(2),
+      faceDown: [[card('2'), card('ACE')], deadLayout(2)], // slot 0 hides a 2, slot 1 hides an ace
     })
     s = trashReducer(s, { type: 'DRAW' }) // ace -> slot0 locks, swap up the 2 -> slot1 locks -> complete
     expect(s.phase).toBe('roundOver')
-    expect(s.roundWinner).toBe('player')
+    expect(s.roundWinner).toBe(0)
     s = trashReducer(s, {
       type: 'NEXT_ROUND',
       stock: [],
-      playerFaceDown: deadLayout(1),
-      aiFaceDown: deadLayout(2),
+      faceDown: [deadLayout(1), deadLayout(2)],
     })
-    expect(s.playerSize).toBe(1)
+    expect(s.sizes[0]).toBe(1)
     expect(s.round).toBe(2)
   })
 
-  it('every match plays to a finish — no stuck state (fuzz, 200 random matches)', () => {
+  it('every solo match plays to a finish — no stuck state (fuzz, 200 random matches)', () => {
     const deal = (pN: number, aN: number) => {
       const d = shuffledDeck()
-      return { playerFaceDown: d.slice(0, pN), aiFaceDown: d.slice(pN, pN + aN), stock: d.slice(pN + aN) }
+      return { faceDown: [d.slice(0, pN), d.slice(pN, pN + aN)], stock: d.slice(pN + aN) }
     }
     for (let game = 0; game < 200; game += 1) {
-      let s = trashReducer(initTrash(), { type: 'START', ...deal(10, 10) })
+      let s = trashReducer(initTrash(2), { type: 'START', ...deal(10, 10) })
       let steps = 0
       while (s.phase !== 'gameover' && steps < 8000) {
         steps += 1
-        if (s.phase === 'aiTurn') {
+        if (s.phase === 'turn' && s.turn === 1) {
           s = trashReducer(s, { type: 'AI_STEP' })
         } else if (s.phase === 'wildChoice') {
-          const slots = s.turn === 'player' ? s.playerSlots : s.aiSlots
-          s = trashReducer(s, { type: 'PLACE_WILD', slot: Math.max(0, firstOpenSlot(slots)) })
+          const slots = s.slots[s.turn]
+          s = trashReducer(s, { type: 'PLACE_WILD', slot: Math.max(0, firstOpenSlot(slots)), seat: s.turn })
         } else if (s.phase === 'roundOver') {
-          const pN = s.roundWinner === 'player' ? s.playerSize - 1 : s.playerSize
-          const aN = s.roundWinner === 'ai' ? s.aiSize - 1 : s.aiSize
+          const pN = s.roundWinner === 0 ? s.sizes[0] - 1 : s.sizes[0]
+          const aN = s.roundWinner === 1 ? s.sizes[1] - 1 : s.sizes[1]
           s = trashReducer(s, { type: 'NEXT_ROUND', ...deal(pN, aN) })
         } else {
           s = trashReducer(s, { type: Math.random() < 0.7 ? 'DRAW' : 'TAKE_DISCARD' })
@@ -143,6 +146,43 @@ describe('trashReducer', () => {
       }
       expect(s.phase).toBe('gameover')
       expect(s.matchWinner).not.toBeNull()
+    }
+  })
+
+  it('every 4-seat online match plays to a finish — no stuck state (fuzz, 100 random matches)', () => {
+    const SEATS = 4
+    for (let game = 0; game < 100; game += 1) {
+      const d = shuffledDeck()
+      const faceDown: Card[][] = []
+      for (let i = 0; i < SEATS; i += 1) faceDown.push(d.slice(i * 10, (i + 1) * 10))
+      let s: TrashState = {
+        ...trashReducer(initTrash(SEATS), { type: 'START', stock: d.slice(SEATS * 10), faceDown }),
+        soloLadder: false, // online mode: first cleared row wins outright
+      }
+      // Taking the discard whenever it's actually useful — the same check
+      // AI_STEP uses — is how any sensible player behaves.
+      let steps = 0
+      while (s.phase !== 'gameover' && steps < 8000) {
+        steps += 1
+        if (s.phase === 'wildChoice') {
+          const slots = s.slots[s.turn]
+          s = trashReducer(s, { type: 'PLACE_WILD', slot: Math.max(0, firstOpenSlot(slots)), seat: s.turn })
+        } else {
+          const top = s.discard[s.discard.length - 1]
+          const useful =
+            top !== undefined &&
+            (() => {
+              const w = placementFor(top, s.sizes[s.turn])
+              return w === 'wild' || (typeof w === 'number' && !s.slots[s.turn][w].locked)
+            })()
+          s = trashReducer(s, { type: useful ? 'TAKE_DISCARD' : 'DRAW', seat: s.turn })
+        }
+      }
+      expect(s.phase).toBe('gameover')
+      expect(s.matchWinner).not.toBeNull()
+      const totalCards =
+        s.slots.reduce((sum, row) => sum + row.length, 0) + s.stock.length + s.discard.length
+      expect(totalCards).toBe(52) // the whole deck, not just what was dealt into rows
     }
   })
 })

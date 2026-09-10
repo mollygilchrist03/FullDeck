@@ -41,9 +41,8 @@ export interface GameServer {
   dealNextHand?: (state: AnyState, cards: Card[]) => AnyState
 }
 
-/** Which reducer role a seat maps to in the player-vs-AI reducers. */
-const role = (seat: number): 'player' | 'ai' => (seat === 0 ? 'player' : 'ai')
-/** War's roles are named player/dealer rather than player/ai. */
+/** War is the one game left on the old binary player/dealer role mapping —
+ * everything else here now addresses seats by index directly. */
 const warRole = (seat: number): 'player' | 'dealer' => (seat === 0 ? 'player' : 'dealer')
 
 const war: GameServer = {
@@ -141,25 +140,17 @@ const goFish: GameServer = {
 }
 
 const trash: GameServer = {
-  deal: (c) => {
-    const s = trashReducer(initTrash(), {
-      type: 'START',
-      stock: c.slice(20),
-      playerFaceDown: c.slice(0, 10),
-      aiFaceDown: c.slice(10, 20),
-    })
+  deal: (c, seatCount) => {
+    const faceDown: Card[][] = []
+    for (let i = 0; i < seatCount; i += 1) faceDown.push(c.slice(i * 10, (i + 1) * 10))
+    const s = trashReducer(initTrash(seatCount), { type: 'START', stock: c.slice(seatCount * 10), faceDown })
     return { ...s, soloLadder: false } // online: first cleared row wins
   },
   reduce: trashReducer,
   authorize: (s, seat, a) => {
-    if (s.phase === 'gameover') return false
-    const want = role(seat)
-    const side = a?.side ?? 'player'
-    if (side !== want) return false
-    if (a?.type === 'PLACE_WILD') return s.phase === 'wildChoice' && s.turn === want
-    if (a?.type === 'DRAW' || a?.type === 'TAKE_DISCARD') {
-      return s.turn === want && s.phase === (want === 'player' ? 'playerTurn' : 'aiTurn')
-    }
+    if (s.phase === 'gameover' || a?.seat !== seat) return false
+    if (a?.type === 'PLACE_WILD') return s.phase === 'wildChoice' && s.turn === seat
+    if (a?.type === 'DRAW' || a?.type === 'TAKE_DISCARD') return s.phase === 'turn' && s.turn === seat
     return false
   },
   isOver: (s) => s.phase === 'gameover',

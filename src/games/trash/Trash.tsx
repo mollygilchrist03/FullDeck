@@ -11,6 +11,8 @@ import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
 import { initTrash, trashReducer, type Slot } from './trashReducer.js'
 
 const AI_STEP_MS = 850
+const YOU = 0
+const AI = 1
 
 function Row({
   slots,
@@ -47,7 +49,7 @@ function Row({
 
 export function Trash() {
   const deck = useDeck()
-  const [state, dispatch] = useReducer(trashReducer, undefined, initTrash)
+  const [state, dispatch] = useReducer(trashReducer, 2, initTrash)
   const [dealing, setDealing] = useState(true)
   const didInit = useRef(false)
 
@@ -59,15 +61,10 @@ export function Trash() {
       try {
         await startNewDeck()
         const c = await drawCards(52)
-        const playerFaceDown = c.slice(0, playerN)
-        const aiFaceDown = c.slice(playerN, playerN + aiN)
+        const faceDown = [c.slice(0, playerN), c.slice(playerN, playerN + aiN)]
         const stock = c.slice(playerN + aiN)
         feedback('deal')
-        dispatch(
-          next
-            ? { type: 'NEXT_ROUND', stock, playerFaceDown, aiFaceDown }
-            : { type: 'START', stock, playerFaceDown, aiFaceDown },
-        )
+        dispatch(next ? { type: 'NEXT_ROUND', stock, faceDown } : { type: 'START', stock, faceDown })
       } catch {
         /* surfaced via deck.error */
       } finally {
@@ -84,35 +81,35 @@ export function Trash() {
   }, [dealRound])
 
   useEffect(() => {
-    if (state.phase !== 'aiTurn') return
+    if (state.phase !== 'turn' || state.turn !== AI) return
     const id = setTimeout(() => {
       feedback('flip')
       dispatch({ type: 'AI_STEP' })
     }, AI_STEP_MS)
     return () => clearTimeout(id)
-  }, [state.phase, state.aiSteps])
+  }, [state.phase, state.turn, state.aiSteps])
 
   useEffect(() => {
-    if (state.phase === 'gameover') feedback(state.matchWinner === 'player' ? 'win' : 'lose')
+    if (state.phase === 'gameover') feedback(state.matchWinner === YOU ? 'win' : 'lose')
   }, [state.phase, state.matchWinner])
 
   useRecordGameOnce({
     terminal: state.phase === 'gameover',
     game: 'trash',
-    score: state.playerTurns,
+    score: state.turnsTaken,
     detail:
-      state.matchWinner === 'player'
-        ? `Won the match in ${state.playerTurns} turns`
+      state.matchWinner === YOU
+        ? `Won the match in ${state.turnsTaken} turns`
         : 'Lost the match',
   })
 
   const nextRound = () => {
-    const pN = state.roundWinner === 'player' ? state.playerSize - 1 : state.playerSize
-    const aN = state.roundWinner === 'ai' ? state.aiSize - 1 : state.aiSize
+    const pN = state.roundWinner === YOU ? state.sizes[YOU] - 1 : state.sizes[YOU]
+    const aN = state.roundWinner === AI ? state.sizes[AI] - 1 : state.sizes[AI]
     void dealRound(pN, aN, true)
   }
 
-  const myTurn = state.phase === 'playerTurn'
+  const myTurn = state.phase === 'turn' && state.turn === YOU
   const discardTop = state.discard[state.discard.length - 1]
   const over = state.phase === 'gameover'
 
@@ -144,10 +141,10 @@ export function Trash() {
       ) : (
         <div className="flex flex-col items-center gap-4">
           <p className="text-xs text-card/60">
-            Round {state.round} · turns {state.playerTurns}
+            Round {state.round} · turns {state.turnsTaken}
           </p>
 
-          <Row slots={state.aiSlots} label={`Dealer — lays ${state.aiSize}`} />
+          <Row slots={state.slots[AI]} label={`Dealer — lays ${state.sizes[AI]}`} />
 
           <div className="flex items-end gap-4">
             <div className="flex flex-col items-center gap-1">
@@ -177,16 +174,16 @@ export function Trash() {
           </div>
 
           <Row
-            slots={state.playerSlots}
-            label={`You — lay ${state.playerSize}`}
+            slots={state.slots[YOU]}
+            label={`You — lay ${state.sizes[YOU]}`}
             onPick={
-          state.phase === 'wildChoice'
-            ? (i) => {
-                feedback('flip')
-                dispatch({ type: 'PLACE_WILD', slot: i })
-              }
-            : undefined
-        }
+              state.phase === 'wildChoice' && state.turn === YOU
+                ? (i) => {
+                    feedback('flip')
+                    dispatch({ type: 'PLACE_WILD', slot: i })
+                  }
+                : undefined
+            }
           />
 
           <p className="min-h-5 max-w-md text-center text-sm text-card/75" role="status" aria-live="polite">
@@ -228,10 +225,10 @@ export function Trash() {
           {over && (
             <div className="flex flex-col items-center gap-3">
               <p className="font-display text-xl text-gold">
-                {state.matchWinner === 'player' ? 'You win the match!' : 'The dealer wins the match.'}
+                {state.matchWinner === YOU ? 'You win the match!' : 'The dealer wins the match.'}
               </p>
-              {state.matchWinner === 'player' && (
-                <ScoreSubmit game="trash" score={state.playerTurns} />
+              {state.matchWinner === YOU && (
+                <ScoreSubmit game="trash" score={state.turnsTaken} />
               )}
               <Button size="lg" variant="gold" onClick={() => void dealRound(10, 10, false)}>
                 Play again

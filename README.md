@@ -10,8 +10,10 @@ Crazy Eights, Slapjack, Go Fish, Trash, and Old Maid — share one foundation, a
 the interesting logic is factored into isolated pure functions with their own
 unit tests rather than tangled into components. Rules follow the Bicycle /
 Wikipedia references, and each game screen carries a matching "How to play"
-panel. Six of the ten are playable head-to-head with a friend over a
-join-code room, not just against the built-in AI.
+panel. Seven of the ten are playable online with friends over a join-code
+room, not just against the built-in AI — six of those seven scale past
+two players, up to a table of six (four for Trash, capped by its own
+card math).
 
 **Live demo:** [full-deck-five.vercel.app](https://full-deck-five.vercel.app)
 
@@ -112,28 +114,26 @@ instant the room's `version` bumps. War, Slapjack, Old Maid, Crazy Eights, Go
 Fish, Trash, and Hold'em are all playable in a room (High-Low stays solo).
 Room size is a per-game declaration — `SEAT_RANGE` in
 [`lib/multiplayer.ts`](src/lib/multiplayer.ts) — not something the room
-plumbing assumes: War and Trash are two-player only (War's rules are
-head-to-head as designed — splitting one deck exactly in half — and
-Trash's 10-card row genuinely doesn't fit more than 4 players in one
-52-card deck), while Slapjack, Crazy Eights, Old Maid, Go Fish, and
-Hold'em all scale to a 2-6 seat table, because their core mechanics
-already generalize — a slap is a race against shared table state rather
-than a pairwise comparison, Crazy Eights' turn order and "two passes
-ends it" rule are just a rotation and a full-lap count once seats are an
-array instead of a named pair, Old Maid's "draw from the dealer" turns
-out to already mean "draw from whoever's next" (2-player just made
-"next" and "not-me" the same seat by coincidence), Go Fish's "ask the
-opponent" needed a genuinely new explicit target — the 2-player version
-had no target field at all, since there was only ever one possible
-answer — and Hold'em's engine already addresses players by seat rather
-than a role. Solo-vs-AI for War/Trash is untouched — their reducers
-carry an optional `side` per move, the AI move-picker just dispatches
-side `'ai'`, and a human in that seat sends the same actions. Slapjack,
-Crazy Eights, Old Maid, Go Fish, and Hold'em instead address seats by
-index from the start, so the identical engine runs a 2-seat solo table
-and a bigger online one; solo Slapjack, Crazy Eights, Old Maid, and Go
-Fish still deal exactly 2 hands (their AI opponent is single-player
-only, not multi-seat).
+plumbing assumes: War is the one holdout stuck at two seats, because its
+actual rules are head-to-head as designed (splitting one deck exactly in
+half); every other room scales, because each game's core mechanics
+turned out to already generalize once seats became an array instead of
+a named pair — a slap is a race against shared table state rather than a
+pairwise comparison, Crazy Eights' turn order and "two passes ends it"
+rule are just a rotation and a full-lap count, Old Maid's "draw from the
+dealer" turns out to already mean "draw from whoever's next" (2-player
+just made "next" and "not-me" the same seat by coincidence), Go Fish's
+"ask the opponent" needed a genuinely new explicit target (the 2-player
+version had no target field at all, since there was only ever one
+possible answer), and Hold'em's engine already addressed players by
+seat from the start. Trash scales too, capped at 4 — not a rules limit
+like War, just its fixed 10-card row not fitting a 6th player's worth of
+cards in one 52-card deck. Solo-vs-AI for War is untouched — its reducer
+carries an optional `side` per move, the AI move-picker just dispatches
+side `'ai'`, and a human in that seat sends the same actions. Every
+other game's solo mode still deals exactly 2 hands (their AI opponent is
+single-player only, not multi-seat) but now runs through the identical
+seat-indexed engine the online room uses, just always at size 2.
 
 **Sound and haptics.** Deal, flip, slap, win, and lose each get a short cue,
 synthesised on the fly with the Web Audio API — oscillator tones and filtered
@@ -230,7 +230,12 @@ and free of any React or network concerns.
   swap up the one underneath, play *that*, …), wilds, dead cards, the
   round ladder (10 → 9 → … → 1), and the match win are all pure and testable —
   no async draws mid-turn. `placementFor(card, size)` is the small function that
-  decides slot / wild / dead.
+  decides slot / wild / dead. Its dead-deck safety valve tracks whether a turn
+  actually *locked* a slot, not just whether a card was drawable — with only
+  2 seats those were effectively the same thing, but at 4 a card keeps being
+  perfectly drawable while being permanently useless to whoever's turn it is,
+  so the old "stock and discard both empty" trigger could let a match spin
+  forever without ever re-triggering the fewest-open-slots tiebreak.
 
 - **A real profanity filter, not a wordlist grep.**
   [`src/lib/profanity.ts`](src/lib/profanity.ts) wraps `obscenity`'s matcher with
@@ -326,7 +331,7 @@ and free of any React or network concerns.
   ([`db/client.ts`](db/client.ts)) throws when `DATABASE_URL` is unset and the
   route turns that into a 503 — the whole app works with no database attached.
 
-- **269 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
+- **274 tests** ([Vitest](https://vitest.dev/)). Most are pure-logic unit tests
   over scoring, dealer AI, outcome settlement, board building, card comparison,
   high-low judging, Hold'em hand ranking and betting, every AI policy, the
   profanity filter, auth input rules, leaderboard validation/formatting, and
@@ -401,9 +406,13 @@ and login still work, there's just no real email in the loop.
 
 Things worth adding if this grew past a portfolio piece:
 
-- War and Trash are still fixed at 2 seats. War's rules are genuinely
-  head-to-head as designed (splitting one deck exactly in half) — any
-  N-player version would be a house-rule variant, not an extension.
-  Trash's row size (10 cards each) caps it at 4 players in one 52-card
-  deck (6×10 doesn't fit); reaching further would mean shrinking the row
-  below Ace–10, a real rule change, not just a seat-count widening.
+- War is the only multiplayer game still fixed at 2 seats. Its rules are
+  genuinely head-to-head as designed (splitting one deck exactly in
+  half) — any N-player version would be a house-rule variant, not an
+  extension of the actual game.
+- Trash tops out at 4 players because its 10-card row doesn't fit a 6th
+  player's worth of cards in one 52-card deck. Reaching 6 would mean
+  shrinking the row below Ace–10, a real rule change (and a decision
+  about whether solo keeps the current 10-card row or moves to the
+  smaller one too), not just widening the seat count the way the other
+  five multiplayer games did.
