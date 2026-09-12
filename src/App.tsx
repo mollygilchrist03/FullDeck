@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { Hub } from './games/hub/Hub.js'
 import { Loading } from './components/Loading.js'
 import { AuthProvider } from './hooks/useAuth.js'
@@ -37,6 +38,7 @@ const ResetPassword = lazy(() =>
 export function App() {
   return (
     <AuthProvider>
+      <Analytics />
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<Hub />} />
