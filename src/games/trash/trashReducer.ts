@@ -249,16 +249,17 @@ export function trashReducer(state: TrashState, action: TrashAction): TrashState
     }
 
     case 'AI_STEP': {
-      // Solo-only: seat 1 is always the AI.
-      if (state.phase !== 'turn' || state.turn !== 1) return state
+      // Solo-only: seat 0 is always the human, every other seat is AI.
+      if (state.phase !== 'turn' || state.turn === 0) return state
+      const seat = state.turn
       const stepped = { ...state, aiSteps: state.aiSteps + 1 }
       // Take the discard if it's immediately useful, otherwise draw.
       const top = state.discard[state.discard.length - 1]
       const useful =
         top &&
         (() => {
-          const w = placementFor(top, state.sizes[1])
-          return w === 'wild' || (typeof w === 'number' && !state.slots[1][w].locked)
+          const w = placementFor(top, state.sizes[seat])
+          return w === 'wild' || (typeof w === 'number' && !state.slots[seat][w].locked)
         })()
       return drawInto(stepped, useful ? 'discard' : 'stock', true)
     }
