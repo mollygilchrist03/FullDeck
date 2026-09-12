@@ -46,6 +46,14 @@ export function chooseAiPlay(hand: Card[], top: Card, activeSuit: Suit): AiPlay 
   const playable = playableCards(hand, top, activeSuit)
   if (playable.length === 0) return null
 
+  // Playing optimally every single turn is unbeatable — leave room for a
+  // human to actually win by picking a random legal card sometimes instead.
+  if (playable.length > 1 && Math.random() < 0.25) {
+    const card = playable[Math.floor(Math.random() * playable.length)]
+    if (card.rank !== '8') return { card }
+    return { card, suit: SUITS[Math.floor(Math.random() * SUITS.length)] }
+  }
+
   const nonEights = playable.filter((c) => c.rank !== '8')
   if (nonEights.length > 0) {
     const keepSuit = nonEights.find((c) => c.suit === activeSuit)

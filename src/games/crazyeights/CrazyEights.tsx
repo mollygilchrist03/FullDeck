@@ -9,6 +9,7 @@ import { GameRules } from '../../components/GameRules.js'
 import { feedback } from '../../lib/feedback.js'
 import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
 import type { Rank, Suit } from '../../types/card.js'
+import { SEAT_RANGE } from '../../lib/multiplayer.js'
 import { isPlayable, SUITS } from './crazyEightsLogic.js'
 import {
   canDraw,
@@ -32,52 +33,60 @@ const RANK_ORDER: Record<Rank, number> = {
 }
 const AI_STEP_MS = 900
 const YOU = 0
-const AI = 1
+const MIN_SEATS = 2
+const MAX_SEATS = SEAT_RANGE['crazy-eights'].max
 
 export function CrazyEights() {
   const deck = useDeck()
+  const [seatCount, setSeatCount] = useState(2)
+  const [started, setStarted] = useState(false)
   const [state, dispatch] = useReducer(crazyEightsReducer, 2, initCrazyEights)
-  const [dealing, setDealing] = useState(true)
+  const [dealing, setDealing] = useState(false)
   const [sortBySuit, setSortBySuit] = useState(false)
   const didInit = useRef(false)
 
   const { startNewDeck, drawCards } = deck
 
-  const newGame = useCallback(async () => {
-    setDealing(true)
-    try {
-      await startNewDeck()
-      const cards = await drawCards(HAND_SIZE * 2 + 4)
-      const hands = [cards.slice(0, HAND_SIZE), cards.slice(HAND_SIZE, HAND_SIZE * 2)]
-      const rest = cards.slice(HAND_SIZE * 2)
-      // The starter can't be an 8 (it would need a suit nomination up front).
-      const starterIdx = rest.findIndex((c) => c.rank !== '8')
-      const discard = [rest[starterIdx]]
-      const stock = rest.filter((_, i) => i !== starterIdx)
-      feedback('deal')
-      dispatch({
-        type: 'START',
-        stock,
-        discard,
-        hands,
-        activeSuit: discard[0].suit,
-      })
-    } catch {
-      /* surfaced via deck.error */
-    } finally {
-      setDealing(false)
-    }
-  }, [startNewDeck, drawCards])
+  const newGame = useCallback(
+    async (seats: number) => {
+      setDealing(true)
+      try {
+        await startNewDeck()
+        const cards = await drawCards(HAND_SIZE * seats + 4)
+        const hands = Array.from({ length: seats }, (_, i) =>
+          cards.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE),
+        )
+        const rest = cards.slice(HAND_SIZE * seats)
+        // The starter can't be an 8 (it would need a suit nomination up front).
+        const starterIdx = rest.findIndex((c) => c.rank !== '8')
+        const discard = [rest[starterIdx]]
+        const stock = rest.filter((_, i) => i !== starterIdx)
+        feedback('deal')
+        dispatch({
+          type: 'START',
+          stock,
+          discard,
+          hands,
+          activeSuit: discard[0].suit,
+        })
+      } catch {
+        /* surfaced via deck.error */
+      } finally {
+        setDealing(false)
+      }
+    },
+    [startNewDeck, drawCards],
+  )
 
   useEffect(() => {
-    if (didInit.current) return
+    if (!started || didInit.current) return
     didInit.current = true
-    void newGame()
-  }, [newGame])
+    void newGame(seatCount)
+  }, [started, newGame, seatCount])
 
-  // Drive the AI's turn one step at a time.
+  // Drive whichever AI seat's turn it is (every seat but yours, in solo play).
   useEffect(() => {
-    if (state.phase !== 'turn' || state.turn !== AI) return
+    if (state.phase !== 'turn' || state.turn === YOU) return
     const t = setTimeout(() => {
       feedback('flip')
       dispatch({ type: 'AI_STEP' })
@@ -89,16 +98,19 @@ export function CrazyEights() {
     if (state.phase === 'gameover') feedback(state.winner === YOU ? 'win' : 'lose')
   }, [state.phase, state.winner])
 
+  const opponents = state.hands.map((_, i) => i).filter((i) => i !== YOU)
+  const opponentCardsLeft = opponents.reduce((sum, i) => sum + state.hands[i].length, 0)
+
   useRecordGameOnce({
     terminal: state.phase === 'gameover',
     game: 'crazy-eights',
-    score: state.winner === YOU && !state.stalemate ? state.hands[AI].length : 0,
+    score: state.winner === YOU && !state.stalemate ? opponentCardsLeft : 0,
     detail: state.stalemate
       ? state.winner === YOU
         ? 'Won on a deadlock'
         : 'Lost on a deadlock'
       : state.winner === YOU
-        ? `Won — ${state.hands[AI].length} left on the AI`
+        ? `Won — ${opponentCardsLeft} left on the table`
         : 'Lost',
   })
 
@@ -123,26 +135,50 @@ export function CrazyEights() {
     })
   }
 
+  if (!started) {
+    return (
+      <Layout title="Crazy Eights">
+        <div className="mx-auto flex max-w-sm flex-col items-center gap-4 text-center">
+          <p className="text-card/80">Playing solo? Pick how many AI opponents to face.</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {Array.from({ length: MAX_SEATS - MIN_SEATS + 1 }, (_, i) => MIN_SEATS + i).map((n) => (
+              <Button
+                key={n}
+                variant={n === seatCount ? 'gold' : 'ghost'}
+                onClick={() => setSeatCount(n)}
+              >
+                {n - 1} AI{n - 1 === 1 ? '' : 's'}
+              </Button>
+            ))}
+          </div>
+          <Button size="lg" variant="gold" onClick={() => setStarted(true)}>
+            Deal
+          </Button>
+        </div>
+      </Layout>
+    )
+  }
+
   return (
     <Layout
       title="Crazy Eights"
       action={
-        <Button variant="gold" onClick={() => void newGame()} disabled={dealing}>
+        <Button variant="gold" onClick={() => void newGame(seatCount)} disabled={dealing}>
           New game
         </Button>
       }
     >
       {deck.error && (
         <div className="mb-4">
-          <ErrorNotice message={deck.error} onRetry={() => void newGame()} />
+          <ErrorNotice message={deck.error} onRetry={() => void newGame(seatCount)} />
         </div>
       )}
 
       <div className="mb-4">
         <GameRules>
-          <p>Be first to play every card in your hand (you each start with seven). On your turn, play a card that matches the top of the discard pile by <strong>suit or rank</strong>, or play any <strong>8</strong> (wild) and name the next suit.</p>
+          <p>Be first to play every card in your hand (everyone starts with seven). On your turn, play a card that matches the top of the discard pile by <strong>suit or rank</strong>, or play any <strong>8</strong> (wild) and name the next suit.</p>
           <p>No legal card? Draw from the stock until you get one. If the stock runs out and you still can't play, pass — the stock reshuffles from the discard pile when it empties.</p>
-          <p>If both players pass with a dead deck, the game ends and the smaller hand wins.</p>
+          <p>If everyone passes with a dead deck, the game ends and the smallest hand wins.</p>
         </GameRules>
       </div>
 
@@ -150,18 +186,23 @@ export function CrazyEights() {
         <Loading label="Dealing…" />
       ) : (
         <div className="flex flex-col items-center gap-5">
-          {/* AI */}
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-xs uppercase tracking-widest text-gold/80">
-              Opponent — {state.hands[AI].length} card{state.hands[AI].length === 1 ? '' : 's'}
-            </p>
-            <div className="flex">
-              {state.hands[AI].slice(0, 12).map((_, i) => (
-                <div key={i} className="-ml-6 first:ml-0 w-10">
-                  <Card faceDown />
+          {/* AI opponents */}
+          <div className="flex flex-wrap justify-center gap-4">
+            {opponents.map((seat) => (
+              <div key={seat} className="flex flex-col items-center gap-1">
+                <p className="text-xs uppercase tracking-widest text-gold/80">
+                  {opponents.length > 1 ? `Seat ${seat + 1}` : 'Opponent'} —{' '}
+                  {state.hands[seat].length} card{state.hands[seat].length === 1 ? '' : 's'}
+                </p>
+                <div className="flex">
+                  {state.hands[seat].slice(0, 12).map((_, i) => (
+                    <div key={i} className="-ml-6 first:ml-0 w-10">
+                      <Card faceDown />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
           {/* Table: stock + discard + active suit */}
@@ -297,15 +338,15 @@ export function CrazyEights() {
                 {state.stalemate
                   ? state.winner === YOU
                     ? 'Deadlock — you had fewer cards. You win.'
-                    : 'Deadlock — the AI had fewer cards. You lose.'
+                    : 'Deadlock — an opponent had fewer cards. You lose.'
                   : state.winner === YOU
                     ? 'You went out — you win!'
-                    : 'The AI went out. You lose.'}
+                    : `Seat ${state.winner! + 1} went out. You lose.`}
               </p>
-              {!state.stalemate && state.winner === YOU && state.hands[AI].length >= 1 && (
-                <ScoreSubmit game="crazy-eights" score={state.hands[AI].length} />
+              {!state.stalemate && state.winner === YOU && opponentCardsLeft >= 1 && (
+                <ScoreSubmit game="crazy-eights" score={opponentCardsLeft} />
               )}
-              <Button size="lg" variant="gold" onClick={() => void newGame()}>
+              <Button size="lg" variant="gold" onClick={() => void newGame(seatCount)}>
                 Play again
               </Button>
             </div>
