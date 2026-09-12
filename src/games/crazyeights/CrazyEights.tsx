@@ -8,7 +8,7 @@ import { ScoreSubmit } from '../../components/ScoreSubmit.js'
 import { GameRules } from '../../components/GameRules.js'
 import { feedback } from '../../lib/feedback.js'
 import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
-import type { Suit } from '../../types/card.js'
+import type { Rank, Suit } from '../../types/card.js'
 import { isPlayable, SUITS } from './crazyEightsLogic.js'
 import {
   canDraw,
@@ -26,6 +26,10 @@ const SUIT_GLYPH: Record<Suit, string> = {
   SPADES: '♠',
 }
 const isRed = (s: Suit) => s === 'HEARTS' || s === 'DIAMONDS'
+const RANK_ORDER: Record<Rank, number> = {
+  ACE: 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, '10': 9,
+  JACK: 10, QUEEN: 11, KING: 12,
+}
 const AI_STEP_MS = 900
 const YOU = 0
 const AI = 1
@@ -34,6 +38,7 @@ export function CrazyEights() {
   const deck = useDeck()
   const [state, dispatch] = useReducer(crazyEightsReducer, 2, initCrazyEights)
   const [dealing, setDealing] = useState(true)
+  const [sortBySuit, setSortBySuit] = useState(false)
   const didInit = useRef(false)
 
   const { startNewDeck, drawCards } = deck
@@ -105,6 +110,18 @@ export function CrazyEights() {
   const mustDraw = myTurn && !hasMove && canDraw(state)
   const mustPass = myTurn && !hasMove && !canDraw(state)
   const over = state.phase === 'gameover'
+
+  // Display order only — the reducer plays cards by index, so sorting here
+  // never touches game state.
+  const handOrder = state.hands[YOU].map((_, i) => i)
+  if (sortBySuit) {
+    handOrder.sort((a, b) => {
+      const ca = state.hands[YOU][a]
+      const cb = state.hands[YOU][b]
+      if (ca.suit !== cb.suit) return SUITS.indexOf(ca.suit) - SUITS.indexOf(cb.suit)
+      return RANK_ORDER[ca.rank] - RANK_ORDER[cb.rank]
+    })
+  }
 
   return (
     <Layout
@@ -208,25 +225,35 @@ export function CrazyEights() {
           )}
 
           {/* Player hand */}
+          <button
+            type="button"
+            onClick={() => setSortBySuit((v) => !v)}
+            className="text-xs text-card/60 underline underline-offset-2 hover:text-card/90"
+          >
+            {sortBySuit ? 'Unsort hand' : 'Sort by suit'}
+          </button>
           <div className="flex flex-wrap justify-center gap-1">
-            {state.hands[YOU].map((c, i) => (
-              <div key={`${c.code}-${i}`} className="w-14 sm:w-16">
-                <Card
-                  card={c}
-                  faceDown={false}
-                  onClick={
-                    myTurn && legal(i)
-                      ? () => {
-                          feedback('flip')
-                          dispatch({ type: 'PLAY', index: i })
-                        }
-                      : undefined
-                  }
-                  disabled={!myTurn || !legal(i)}
-                  className={myTurn && legal(i) ? 'ring-2 ring-gold' : 'opacity-55'}
-                />
-              </div>
-            ))}
+            {handOrder.map((i) => {
+              const c = state.hands[YOU][i]
+              return (
+                <div key={c.code} className="w-14 sm:w-16">
+                  <Card
+                    card={c}
+                    faceDown={false}
+                    onClick={
+                      myTurn && legal(i)
+                        ? () => {
+                            feedback('flip')
+                            dispatch({ type: 'PLAY', index: i })
+                          }
+                        : undefined
+                    }
+                    disabled={!myTurn || !legal(i)}
+                    className={myTurn && legal(i) ? 'ring-2 ring-gold' : 'opacity-55'}
+                  />
+                </div>
+              )
+            })}
           </div>
 
           {/* Controls */}
