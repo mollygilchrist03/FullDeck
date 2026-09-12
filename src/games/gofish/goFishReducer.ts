@@ -16,10 +16,11 @@ export interface GoFishState {
    * an empty-hand draw-up, which isn't chasing any particular rank). */
   pendingRank: Rank | null
   /**
-   * The solo AI's memory (seat 1 only): ranks seat 0 has *asked* for (public
-   * information — you can only ask for a rank you hold). Capped to the last
-   * couple of asks, and an entry is dropped once the AI has asked for it.
-   * Multiplayer has no AI seat, so this is simply unused there.
+   * Every AI seat's shared memory (solo only): ranks the human (seat 0) has
+   * *asked* for (public information — you can only ask for a rank you
+   * hold). Capped to the last couple of asks, and an entry is dropped once
+   * an AI has asked for it. Multiplayer has no AI seat, so this is simply
+   * unused there.
    */
   knownPlayerRanks: Rank[]
   /** Increments each AI_STEP so the container can keep stepping. */
@@ -214,16 +215,26 @@ export function goFishReducer(state: GoFishState, action: GoFishAction): GoFishS
       return doDraw(state, action.seat ?? 0)
 
     case 'AI_STEP': {
-      // Solo-only: seat 1 is always the AI, always targeting seat 0.
-      if (state.turn !== 1 || (state.phase !== 'ask' && state.phase !== 'draw')) return state
+      // Solo-only: seat 0 is always the human, every other seat is AI.
+      if (state.turn === 0 || (state.phase !== 'ask' && state.phase !== 'draw')) return state
+      const seat = state.turn
+      const n = state.hands.length
       const stepped = { ...state, aiSteps: state.aiSteps + 1 }
-      if (stepped.phase === 'draw') return doDraw(stepped, 1)
-      const ask = chooseAiAsk(state.hands[1], state.knownPlayerRanks)
-      if (ask) return doAsk(stepped, 1, ask, 0)
+      if (stepped.phase === 'draw') return doDraw(stepped, seat)
+      const ask = chooseAiAsk(state.hands[seat], state.knownPlayerRanks)
+      if (ask) {
+        // Prefer the human when this rank is a known player-held one;
+        // otherwise pick an opponent seat at random.
+        const opponents = state.hands.map((_, i) => i).filter((i) => i !== seat)
+        const target = state.knownPlayerRanks.includes(ask)
+          ? 0
+          : opponents[Math.floor(Math.random() * opponents.length)]
+        return doAsk(stepped, seat, ask, target)
+      }
       // No cards to ask with.
       return stepped.stock.length > 0
         ? { ...stepped, phase: 'draw', pendingRank: null }
-        : toTurn(stepped, 0)
+        : toTurn(stepped, (seat + 1) % n)
     }
 
     case 'RESET':

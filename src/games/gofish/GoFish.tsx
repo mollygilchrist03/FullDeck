@@ -9,6 +9,7 @@ import { useDeck } from '../../hooks/useDeck.js'
 import { feedback } from '../../lib/feedback.js'
 import { useRecordGameOnce } from '../../hooks/useRecordGame.js'
 import type { Rank } from '../../types/card.js'
+import { SEAT_RANGE } from '../../lib/multiplayer.js'
 import { ranksIn } from './goFishLogic.js'
 import { goFishReducer, initGoFish } from './goFishReducer.js'
 
@@ -29,7 +30,9 @@ const RANK_SHORT: Record<Rank, string> = {
 }
 const AI_STEP_MS = 950
 const YOU = 0
-const AI = 1
+const MIN_SEATS = 2
+const MAX_SEATS = SEAT_RANGE['go-fish'].max
+const HAND_SIZE = 7
 
 function Books({ label, books, mine }: { label: string; books: Rank[]; mine?: boolean }) {
   return (
@@ -62,33 +65,43 @@ function Books({ label, books, mine }: { label: string; books: Rank[]; mine?: bo
 
 export function GoFish() {
   const deck = useDeck()
+  const [seatCount, setSeatCount] = useState(2)
+  const [started, setStarted] = useState(false)
   const [state, dispatch] = useReducer(goFishReducer, 2, initGoFish)
-  const [dealing, setDealing] = useState(true)
+  const [dealing, setDealing] = useState(false)
+  const [askTarget, setAskTarget] = useState<number | null>(null)
   const didInit = useRef(false)
 
   const { drawCards } = deck
 
-  const newGame = useCallback(async () => {
-    setDealing(true)
-    try {
-      const c = await drawCards(52)
-      feedback('deal')
-      dispatch({ type: 'START', hands: [c.slice(0, 7), c.slice(7, 14)], stock: c.slice(14) })
-    } catch {
-      /* surfaced via deck.error */
-    } finally {
-      setDealing(false)
-    }
-  }, [drawCards])
+  const newGame = useCallback(
+    async (seats: number) => {
+      setDealing(true)
+      try {
+        const c = await drawCards(52)
+        const hands = Array.from({ length: seats }, (_, i) =>
+          c.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE),
+        )
+        feedback('deal')
+        dispatch({ type: 'START', hands, stock: c.slice(HAND_SIZE * seats) })
+      } catch {
+        /* surfaced via deck.error */
+      } finally {
+        setDealing(false)
+      }
+    },
+    [drawCards],
+  )
 
   useEffect(() => {
-    if (didInit.current) return
+    if (!started || didInit.current) return
     didInit.current = true
-    void newGame()
-  }, [newGame])
+    void newGame(seatCount)
+  }, [started, newGame, seatCount])
 
+  // Whichever AI seat's turn it is asks or draws.
   useEffect(() => {
-    if (state.turn !== AI || (state.phase !== 'ask' && state.phase !== 'draw')) return
+    if (state.turn === YOU || (state.phase !== 'ask' && state.phase !== 'draw')) return
     const id = setTimeout(() => {
       feedback('flip')
       dispatch({ type: 'AI_STEP' })
@@ -100,38 +113,73 @@ export function GoFish() {
     if (state.phase === 'gameover') feedback(state.winner === YOU ? 'win' : 'lose')
   }, [state.phase, state.winner])
 
+  useEffect(() => {
+    setAskTarget(null)
+  }, [state.turn])
+
+  const opponentBooks = state.books.reduce(
+    (sum, b, i) => (i === YOU ? sum : sum + b.length),
+    0,
+  )
+
   useRecordGameOnce({
     terminal: state.phase === 'gameover',
     game: 'go-fish',
     score: state.books[YOU].length,
-    detail: `${state.winner === YOU ? 'Won' : 'Lost'} ${state.books[YOU].length}–${state.books[AI].length}`,
+    detail: `${state.winner === YOU ? 'Won' : 'Lost'} ${state.books[YOU].length}–${opponentBooks}`,
   })
 
   const over = state.phase === 'gameover'
   const myTurn = state.turn === YOU
+  const opponents = state.hands.map((_, i) => i).filter((i) => i !== YOU)
   const myRanks = ranksIn(state.hands[YOU]).sort(
     (a, b) => Object.keys(RANK_SHORT).indexOf(a) - Object.keys(RANK_SHORT).indexOf(b),
   )
+  const target = opponents.length === 1 ? opponents[0] : askTarget
+
+  if (!started) {
+    return (
+      <Layout title="Go Fish">
+        <div className="mx-auto flex max-w-sm flex-col items-center gap-4 text-center">
+          <p className="text-card/80">Playing solo? Pick how many AI opponents to face.</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {Array.from({ length: MAX_SEATS - MIN_SEATS + 1 }, (_, i) => MIN_SEATS + i).map((n) => (
+              <Button
+                key={n}
+                variant={n === seatCount ? 'gold' : 'ghost'}
+                onClick={() => setSeatCount(n)}
+              >
+                {n - 1} AI{n - 1 === 1 ? '' : 's'}
+              </Button>
+            ))}
+          </div>
+          <Button size="lg" variant="gold" onClick={() => setStarted(true)}>
+            Deal
+          </Button>
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout
       title="Go Fish"
       action={
-        <Button variant="gold" onClick={() => void newGame()} disabled={dealing}>
+        <Button variant="gold" onClick={() => void newGame(seatCount)} disabled={dealing}>
           New game
         </Button>
       }
     >
       {deck.error && (
         <div className="mb-4">
-          <ErrorNotice message={deck.error} onRetry={() => void newGame()} />
+          <ErrorNotice message={deck.error} onRetry={() => void newGame(seatCount)} />
         </div>
       )}
 
       <div className="mb-4">
         <GameRules>
-          <p>Collect more sets of four (books) than the dealer. On your turn, ask the dealer for a rank you already hold at least one of.</p>
-          <p>If they have any, you take all of them and ask again. If not — <strong>go fish</strong>: draw from the stock. Draw exactly what you asked for and you go again; otherwise it's the dealer's turn.</p>
+          <p>Collect more sets of four (books) than anyone else. On your turn, ask another player for a rank you already hold at least one of.</p>
+          <p>If they have any, you take all of them and ask again. If not — <strong>go fish</strong>: draw from the stock. Draw exactly what you asked for and you go again; otherwise play passes on.</p>
           <p>The game ends when all thirteen books are made. Your book count in a win is your score.</p>
         </GameRules>
       </div>
@@ -140,22 +188,32 @@ export function GoFish() {
         <Loading label="Dealing…" />
       ) : (
         <div className="flex flex-col items-center gap-4">
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-xs uppercase tracking-widest text-gold/80">
-              Dealer — {state.hands[AI].length} cards
-            </p>
-            <div className="flex">
-              {state.hands[AI].slice(0, 12).map((_, i) => (
-                <div key={i} className="-ml-6 w-10 first:ml-0">
-                  <Card faceDown />
+          <div className="flex flex-wrap justify-center gap-4">
+            {opponents.map((seat) => (
+              <div key={seat} className="flex flex-col items-center gap-1">
+                <p className="text-xs uppercase tracking-widest text-gold/80">
+                  {opponents.length > 1 ? `Seat ${seat + 1}` : 'Dealer'} — {state.hands[seat].length} cards
+                </p>
+                <div className="flex">
+                  {state.hands[seat].slice(0, 12).map((_, i) => (
+                    <div key={i} className="-ml-6 w-10 first:ml-0">
+                      <Card faceDown />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
           <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
             <Books label="Your books" books={state.books[YOU]} mine />
-            <Books label="Dealer books" books={state.books[AI]} />
+            {opponents.map((seat) => (
+              <Books
+                key={seat}
+                label={opponents.length > 1 ? `Seat ${seat + 1} books` : 'Dealer books'}
+                books={state.books[seat]}
+              />
+            ))}
           </div>
 
           {/* The stock — click it to fish when you've missed. */}
@@ -191,11 +249,22 @@ export function GoFish() {
           {!over ? (
             <div className="flex flex-col items-center gap-2">
               <p className="text-sm text-card/70">
-                {myTurn && state.phase === 'ask'
-                  ? 'Ask the dealer for:'
-                  : myTurn && state.phase === 'draw'
-                    ? 'Go fish — tap the stock to draw.'
-                    : 'Dealer is thinking…'}
+                {myTurn && state.phase === 'ask' && target === null
+                  ? 'Ask which seat?'
+                  : myTurn && state.phase === 'ask'
+                    ? `Ask ${opponents.length > 1 ? `Seat ${target! + 1}` : 'the dealer'} for:`
+                    : myTurn && state.phase === 'draw'
+                      ? 'Go fish — tap the stock to draw.'
+                      : 'Waiting on the table…'}
+                {myTurn && state.phase === 'ask' && target !== null && opponents.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setAskTarget(null)}
+                    className="ml-2 text-xs text-gold underline underline-offset-2"
+                  >
+                    change
+                  </button>
+                )}
               </p>
               {myTurn && state.phase === 'draw' ? (
                 <Button
@@ -208,6 +277,14 @@ export function GoFish() {
                 >
                   🎣 Go fish
                 </Button>
+              ) : myTurn && state.phase === 'ask' && target === null ? (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {opponents.map((seat) => (
+                    <Button key={seat} variant="ghost" onClick={() => setAskTarget(seat)}>
+                      Seat {seat + 1} ({state.hands[seat].length})
+                    </Button>
+                  ))}
+                </div>
               ) : (
                 <div className="flex flex-wrap justify-center gap-2">
                   {myRanks.map((r) => (
@@ -216,7 +293,7 @@ export function GoFish() {
                       variant="gold"
                       onClick={() => {
                         feedback('flip')
-                        dispatch({ type: 'ASK', rank: r, target: AI })
+                        dispatch({ type: 'ASK', rank: r, target: target! })
                       }}
                       disabled={!myTurn || state.phase !== 'ask'}
                     >
@@ -230,13 +307,13 @@ export function GoFish() {
             <div className="flex flex-col items-center gap-3">
               <p className="font-display text-xl text-gold">
                 {state.winner === YOU
-                  ? `You win ${state.books[YOU].length}–${state.books[AI].length}!`
-                  : `The dealer wins ${state.books[AI].length}–${state.books[YOU].length}.`}
+                  ? `You win ${state.books[YOU].length}–${opponentBooks}!`
+                  : `Seat ${state.winner! + 1} wins ${state.books[state.winner!].length}–${state.books[YOU].length}.`}
               </p>
               {state.books[YOU].length >= 1 && (
                 <ScoreSubmit game="go-fish" score={state.books[YOU].length} />
               )}
-              <Button size="lg" variant="gold" onClick={() => void newGame()}>
+              <Button size="lg" variant="gold" onClick={() => void newGame(seatCount)}>
                 Play again
               </Button>
             </div>
