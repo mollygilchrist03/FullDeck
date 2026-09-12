@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useMuted } from '../hooks/useMuted.js'
 import { toggleMuted } from '../lib/soundSettings.js'
 import { useAuth } from '../hooks/authContext.js'
+import { useVisitCount } from '../hooks/useVisitCount.js'
 import { Icon } from './Icon.js'
 
 const NAV_LINK =
@@ -23,6 +24,7 @@ export function Layout({ title, action, children }: LayoutProps) {
   const onAccount = path === '/account'
   const muted = useMuted()
   const { user } = useAuth()
+  const visits = useVisitCount()
 
   return (
     <div className="mx-auto flex min-h-full max-w-4xl flex-col px-4 pb-36 pt-4 sm:pb-8">
@@ -79,6 +81,9 @@ export function Layout({ title, action, children }: LayoutProps) {
         </div>
       </header>
       <main className="flex-1">{children}</main>
+      <footer className="mt-8 text-center text-xs text-card/40">
+        {visits != null && <p>{visits.toLocaleString()} visits</p>}
+      </footer>
     </div>
   )
 }

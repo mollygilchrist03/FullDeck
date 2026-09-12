@@ -209,3 +209,12 @@ export const roomAttempts = pgTable(
 )
 
 export type RoomAttemptRow = typeof roomAttempts.$inferSelect
+
+/** Single row (id 1) holding the running total of site visits shown on the
+ * hub page — a public, cosmetic counter, not an analytics source. */
+export const siteVisits = pgTable('site_visits', {
+  id: integer('id').primaryKey(),
+  count: integer('count').notNull().default(0),
+})
+
+export type SiteVisitsRow = typeof siteVisits.$inferSelect
