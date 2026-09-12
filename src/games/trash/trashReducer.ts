@@ -75,9 +75,8 @@ export function initTrash(seatCount: number): TrashState {
  * swapped-up cards; stops at a dead card, a filled slot, a wild that needs a
  * choice (a human seat only), or a completed layout.
  */
-function resolve(state: TrashState, auto = false, progressedAlready = false): TrashState {
+function resolve(state: TrashState, auto = false): TrashState {
   let s = state
-  let progressed = progressedAlready
   // Safety bound — a layout can't chain more than its size.
   for (let guard = 0; guard < START_SIZE + 2; guard += 1) {
     const seat = s.turn
@@ -89,7 +88,7 @@ function resolve(state: TrashState, auto = false, progressedAlready = false): Tr
     const where = placementFor(card, size)
 
     if (where === 'dead') {
-      return endTurn(s, `Seat ${seat + 1} drew ${card.rank.toLowerCase()} — nothing to do.`, progressed)
+      return endTurn(s, `Seat ${seat + 1} drew ${card.rank.toLowerCase()} — nothing to do.`)
     }
 
     if (where === 'wild') {
@@ -97,15 +96,13 @@ function resolve(state: TrashState, auto = false, progressedAlready = false): Tr
       if (open === -1) return roundWin(s, seat)
       if (!auto) return { ...s, phase: 'wildChoice' }
       s = lock(s, seat, open)
-      progressed = true
       continue
     }
 
     if (slots[where].locked) {
-      return endTurn(s, `Seat ${seat + 1} can't use that ${card.rank.toLowerCase()} — slot ${where + 1} is done.`, progressed)
+      return endTurn(s, `Seat ${seat + 1} can't use that ${card.rank.toLowerCase()} — slot ${where + 1} is done.`)
     }
     s = lock(s, seat, where)
-    progressed = true
     if (isLayoutComplete(s.slots[seat])) return roundWin(s, seat)
   }
   return s
@@ -138,19 +135,10 @@ function deadDeck(state: TrashState): TrashState {
   )
 }
 
-/** `progressed` is whether this turn locked any slot at all — a card can
- * always be *drawn* as long as the deck has cards left, but with more seats
- * sharing one deck, "drawable" and "useful to whoever's turn it is" are very
- * different: a turn can succeed at drawing a card every time and still make
- * zero progress toward anyone's layout, forever. `stalePasses` has to track
- * *that*, not just "stock and discard both ran dry" — the narrower check was
- * fine when 2 seats made "nothing to draw" and "no progress possible" the
- * same thing, but they aren't the same thing once more seats are sharing
- * the deck. */
-function endTurn(state: TrashState, message: string, progressed: boolean): TrashState {
-  const stalePasses = progressed ? 0 : state.stalePasses + 1
+function endTurn(state: TrashState, message: string, forced = false): TrashState {
+  const stalePasses = forced ? state.stalePasses + 1 : 0
   const n = state.slots.length
-  if (stalePasses >= n) return deadDeck(state)
+  if (forced && stalePasses >= n) return deadDeck(state)
   const discard = state.held ? [...state.discard, state.held] : state.discard
   const nextTurn = (state.turn + 1) % n
   return {
@@ -207,7 +195,7 @@ function drawInto(state: TrashState, source: 'stock' | 'discard', auto = false):
   }
   if (state.stock.length === 0) {
     // Recycle the discard (minus its top) into the stock.
-    if (state.discard.length <= 1) return endTurn(state, 'Deck exhausted — turn passes.', false)
+    if (state.discard.length <= 1) return endTurn(state, 'Deck exhausted — turn passes.', true)
     const top = state.discard[state.discard.length - 1]
     return drawInto(
       { ...state, stock: shuffle(state.discard.slice(0, -1)), discard: [top] },
@@ -257,7 +245,7 @@ export function trashReducer(state: TrashState, action: TrashAction): TrashState
       const slots = state.slots[seat]
       if (action.slot < 0 || action.slot >= slots.length || slots[action.slot].locked) return state
       const locked = lock({ ...state, phase: 'turn' }, seat, action.slot)
-      return resolve(isLayoutComplete(locked.slots[seat]) ? roundWin(locked, seat) : locked, false, true)
+      return resolve(isLayoutComplete(locked.slots[seat]) ? roundWin(locked, seat) : locked)
     }
 
     case 'AI_STEP': {
